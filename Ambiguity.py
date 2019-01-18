@@ -1,5 +1,6 @@
 import HelperFunctions as hf
 import random
+import math
 from copy import deepcopy
 from ROOT import gROOT, TCanvas, TF1, TFile, gStyle,TH2F, TH1F
 import time
@@ -7,30 +8,37 @@ import time
 hf.SetSeed(2022)
 
 readExternal=False
-inFile="Run01_2mmCCol_160pA_TrackTrig_SDS__all_events_RTS1_SYNC_Data.txt"
-#inFile="Run01_2mmCCol_160pA_TrackTrig_SDS_all_events_SYNC.txt"
 
 NLoops=1000
 size=10 #cm
 tolerance=1.01
-effTolerance=1.8
-
+effTolerance=math.sqrt(2)
 rawAngle=60
+saveStripMaps=False
+
+xmax=size*5000
 
 #gStyle.SetOptStat(0000)
 gROOT.SetBatch(True)
 
 if readExternal==True:
 
+        inFile="Run01_2mmCCol_160pA_TrackTrig_SDS_all_events_SYNC.txt"
+        #inFile="Run01_2mmCCol_160pA_TrackTrig_SDS__all_events_RTS1_SYNC_Data.txt"
         pitch=90.8
-        size=1.5
+        size=10
+        xmax=size*5000
+        tolerance=5.01
+        rawAngle=60
+
         #Set up histograms
         MyFile =TFile("test.root","RECREATE");
-        xmax=size*5000
         binscale=1
         myHitMap=TH2F("myHitMap","Hit Locations",(int)(2*xmax/pitch)/binscale,-xmax,xmax,(int)(2*xmax/pitch)/binscale,-xmax,xmax)
-        
-        #read in hits, grouped by timestamp
+        myRefinedHitMap=TH2F("myRefinedHitMap","Hit Locations",(int)(2*xmax/pitch)/binscale,-xmax,xmax,(int)(2*xmax/pitch)/binscale,-xmax,xmax)
+        myRefinedHitMap2=TH2F("myRefinedHitMap2","Hit Locations",(int)(2*xmax/pitch)/binscale,-xmax,xmax,(int)(2*xmax/pitch)/binscale,-xmax,xmax)
+
+        #read in hits, grouped by timestamp. Expects rosetta stile formatting: time, v1,v2,v3,v4, x1,x2,x3,x4, u1,u2,u3,u4
         hitsByTimestamp=hf.ReadXUVStripCoOrds(inFile)
         print("Timestamps provided "+(str)(len(hitsByTimestamp)))
 
@@ -40,18 +48,30 @@ if readExternal==True:
                 StripX=hitsByTimestamp[i][0]
                 StripU=hitsByTimestamp[i][1]
                 StripV=hitsByTimestamp[i][2]
-
+                #print(StripX,StripU,StripV)
                 #find hits
                 allHits=hf.FindOverlaps(StripX,StripU,StripV,pitch,rawAngle,tolerance)
                 reconstructedHits+=len(allHits)
-
                 #add results to hit map
                 for hit in allHits:
                         myHitMap.Fill(hit[0],hit[1])
 
+                #tidy up based on effective pixel area
+                allHits=hf.RemoveAdjacentHits(allHits,tolerance,pitch)
+                for hit in allHits:
+                        myRefinedHitMap.Fill(hit[0],hit[1])
+
+                allHits=hf.RemoveAmbiguities(allHits,rawAngle,pitch)
+                for hit in allHits:
+                        myRefinedHitMap2.Fill(hit[0],hit[1])
+
+
+
         print ("Reconstructed hits= "+(str)(reconstructedHits))
 
         myHitMap.Write()        
+        myRefinedHitMap.Write()        
+        myRefinedHitMap2.Write()        
         MyFile.Close()
 else:
 
@@ -87,6 +107,9 @@ else:
                         hRefinedHits2=TH1F("hRefinedHits2","n Reconstructed Hits (Refined2)",20,-4.5,24.5)
                         hRefinedEfficiency2=TH1F("hRefinedEfficiency2","Refined Efficiency",10,5,105)
 
+                        myHitMap=TH2F("myHitMap","Hit Locations",(int)(2*xmax/pitch),-xmax,xmax,(int)(2*xmax/pitch),-xmax,xmax)
+
+                        
                         for i in range(NLoops):
                                 print("Processing loop "+(str)(i))
                                 #generate N=10 random points for x-y 
@@ -100,25 +123,31 @@ else:
                                 allHits=hf.FindOverlaps(StripX,StripU,StripV,pitch,rawAngle,tolerance)
                                 nRawHits+=len(allHits)
                                 hRawHits.Fill(len(allHits))
-                                hf.PlotHitMap("RawHits",allHits,XY,StripX,StripU,StripV,pitch,size,i,rawAngle)
+                                if saveStripMaps:
+                                        hf.PlotHitMap("RawHits",allHits,XY,StripX,StripU,StripV,pitch,size,i,rawAngle)
                                 rawEff=hf.GetEfficiency(allHits,XY,pitch,effTolerance)
                                 hRawEfficiency.Fill(100*rawEff)
                                 nProton_RawEffCorrected+=nProton*rawEff
+
+                                for hit in allHits:
+                                        myHitMap.Fill(hit[0],hit[1])
 
                                 #remove duplicate hits (separated by < tolerance) 
                                 refinedHits=hf.RemoveAdjacentHits(allHits,tolerance,pitch)
                                 nRefinedHits+=len(refinedHits)
                                 hRefinedHits.Fill(len(refinedHits))
-                                hf.PlotHitMap("RefinedHits",refinedHits,XY,StripX,StripU,StripV,pitch,size,i,rawAngle)
+                                if saveStripMaps:
+                                        hf.PlotHitMap("RefinedHits",refinedHits,XY,StripX,StripU,StripV,pitch,size,i,rawAngle)
                                 refinedEff=hf.GetEfficiency(refinedHits,XY,pitch,effTolerance)
                                 hRefinedEfficiency.Fill(100*refinedEff)
                                 nProton_RefinedEffCorrected+=nProton*refinedEff
 
                                 #Try removing hits where same strip is used multiple times
-                                refinedHits2=hf.RemoveAmbiguities(refinedHits)
+                                refinedHits2=hf.RemoveAmbiguities(refinedHits,rawAngle,pitch)
                                 nRefinedHits2+=len(refinedHits2)
                                 hRefinedHits2.Fill(len(refinedHits2))
-                                hf.PlotHitMap("RefinedHits2",refinedHits2,XY,StripX,StripU,StripV,pitch,size,i,rawAngle)
+                                if saveStripMaps:
+                                        hf.PlotHitMap("RefinedHits2",refinedHits2,XY,StripX,StripU,StripV,pitch,size,i,rawAngle)
                                 refinedEff2=hf.GetEfficiency(refinedHits2,XY,pitch,effTolerance)
                                 hRefinedEfficiency2.Fill(100*refinedEff2)
                                 nProton_Refined2EffCorrected+=nProton*refinedEff2
@@ -141,6 +170,7 @@ else:
                         hRefinedEfficiency.Write()
                         hRefinedHits2.Write()
                         hRefinedEfficiency2.Write()
+                        myHitMap.Write()
                         MyFile.Close()
                         ambiguityRate.Fill(pitch,nProton,rawAmbiguity)
                         ambiguityRateRefined.Fill(pitch,nProton,refinedAmbiguity)

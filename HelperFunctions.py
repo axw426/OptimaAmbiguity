@@ -9,10 +9,12 @@ def SetSeed(seed):
 def GetRandomXY(nProtons,size):
 	XY=[]
 	for x in range(nProtons):
-		X=random.uniform(-size*5000,size*5000) #10000 um per cm
-		Y=random.uniform(-size*5000,size*5000)
+		X=random.uniform(-size*5000.0,size*5000.0) #10000 um per cm
+		Y=random.uniform(-size*5000.0,size*5000.0) #10000 um per cm
+	#	X=random.gauss(3000.0,2000)
+	#	Y=random.gauss(3000.0,2000)
                 XY.append([X,Y])
-	
+	        #print X,Y
 	return XY
 
 #convert points into a strip number for each layer assuming pitch of 100um
@@ -36,25 +38,24 @@ def FindMandC(U,theta,pitch):
         return m,c
 
 def FindIntersect(X,U,theta,pitch):
+
 	#in X frame, x*100+50 to get to middle of strip
 	#U line described by y=mx+c, where: m=-tan(90-Theta),c= X'/cos(90-theta)
+
 	x=(X*pitch)+pitch/2.0
 	m,c=FindMandC(U,theta,pitch)
 	y=(m*x)+c
-	#print("M=",m,"c=",c,"x=",x,"X'=",xPrime,"y=",y)
+
+        #print("M=",m,"c=",c,"x=",x,"X'=",xPrime,"y=",y)
 	
 	return [x,y]
 	
 def FindUVIntersect(U,V,uAngle,vAngle,pitch):
 
 	#define y=mx+c for U and V in frame of X layer
-	x_U=(U*pitch)+pitch/2.0
-	m1=-1*math.tan(math.radians(90-uAngle))
-	c1=x_U/math.cos(math.radians(90-uAngle))
+        m1,c1=FindMandC(U,uAngle,pitch)
 	
-	x_V=(V*pitch)+pitch/2.0
-	m2=-1*math.tan(math.radians(90-vAngle))
-	c2=x_V/math.cos(math.radians(90-vAngle))
+        m2,c2=FindMandC(V,vAngle,pitch)
 	
 	Xintercept=(c2-c1)/(m1-m2)
 	Yintercept1=(m1*Xintercept) + c1
@@ -121,6 +122,16 @@ def RestrictLine(l, xmin, ymin, xmax, ymax,m,c):
 
         return l
 
+def CreateTLines(xmax,U,uAngle,pitch):
+
+	m1,c1=FindMandC(U,-uAngle,pitch)
+	myline= TLine(-xmax,m1*(-xmax)+c1,xmax,m1*(xmax)+c1 )
+        myline.SetLineColor(1)
+        myline.SetLineWidth(1)
+
+        return RestrictLine(myline, -xmax, -xmax, xmax, xmax,m1,c1)
+        
+
 def checkForDuplicates(xmean,ymean,allHits,tolerance):
         
         for hit in allHits:
@@ -140,34 +151,16 @@ def FindOverlaps(StripX,StripU,StripV,pitch,rawAngle,tolerance):
 		for U in StripU:
 			for V in StripV:
                                 xycoords=[]
-
 				xycoords.append(FindIntersect(X,U,-rawAngle,pitch))
 				xycoords.append(FindIntersect(X,V,rawAngle,pitch))
 				xycoords.append(FindUVIntersect(U,V,-rawAngle,rawAngle,pitch))
 				passed,xmean,ymean,rValues=CheckProximity(xycoords,tolerance,pitch)
                                 if passed==True:
                                         allHits.append([xmean,ymean,X,U,V,rValues])
+                                #else:
+                                 #       print(X,U,V,xycoords[0],xycoords[1],xycoords[2])
 
 	return allHits
-
-def CreateHitMap(myHitMap,StripX,StripU,StripV,pitch,rawAngle,tolerance):
-
-        nHits=0
-	#find the Y coordinate where the X and U or V intercept and see if they are close
-	for X in StripX:
-		for U in StripU:
-			for V in StripV:
-				x1,y1=FindIntersect(X,U,-rawAngle,pitch)
-				x2,y2=FindIntersect(X,V,rawAngle,pitch)
-				x3,y3,m1,c1,m2,c2=FindUVIntersect(U,V,-rawAngle,rawAngle,pitch)
-				passed,xmean,ymean=CheckProximity(x1,x2,x3,y1,y2,y3,tolerance,pitch)
-                                #print x1,y1,xmean,ymean
-                                #print m1,m2
-                                if passed==True:
-                                        myHitMap.Fill(xmean,ymean)
-                                        nHits+=1
-        return nHits
-
 
 
 def ReadXUVStripCoOrds(inFile):
@@ -181,7 +174,6 @@ def ReadXUVStripCoOrds(inFile):
         hUStrips=TH1F("hUStrips","n Strip Positions U",1024,-0.5,1023.5)
         hVStrips=TH1F("hVStrips","n Strip Positions V",1024,-0.5,1023.5)
 
-        #outf=open("myoutput.txt","w+")
 
         with open(inFile,'r') as f:
                 line=f.readline()#first line is empty...
@@ -193,15 +185,12 @@ def ReadXUVStripCoOrds(inFile):
                         timestamp=values[0]
                         #if timestamp has changed and there was a hit recorded, save data
                         if timestamp!=lastTimestamp and xcoords:
-                                #outf=open("myoutput.txt","a+")
-                                #outf.write((str)(timestamp)+", "+(str)(vcoords)+", "+(str)(xcoords)+", "+(str)(ucoords)+"\n")
-                                #outf.close()
-                                xcoords[:]=[(var-512) for var in xcoords]
-                                ucoords[:]=[(var-512) for var in ucoords]
-                                vcoords[:]=[(var-512) for var in vcoords]
+
+                                xcoords[:]=[-(var-512) for var in xcoords]
+                                ucoords[:]=[-(var-512) for var in ucoords]
+                                vcoords[:]=[-(var-512) for var in vcoords]
                                 hitsByTimestamp.append([xcoords,ucoords,vcoords])
 
-                                #reset vectors
                                 lastTimestamp=timestamp
                                 ucoords=[]
                                 xcoords=[]
@@ -216,25 +205,12 @@ def ReadXUVStripCoOrds(inFile):
                                         hVStrips.Fill((int)(values[i]))
                                         hUStrips.Fill((int)(values[i+8]))
 
-                                #elif values[i] !='-1' and values[i+4] !='-1':
-                                #        hVStrips.Fill((int)(values[i]))
-                                #        hXStrips.Fill((int)(values[i+4]))
-
-                                #elif values[i] !='-1' and values[i+8] !='-1':
-                                #        hVStrips.Fill((int)(values[i]))
-                                #        hUStrips.Fill((int)(values[i+8]))
-
-                                #elif values[i+4] !='-1' and  values[i+8] !='-1':
-                                #        hXStrips.Fill((int)(values[i+4]))
-                                #        hUStrips.Fill((int)(values[i+8]))
-
-
                                 #check value is valid
                                 if ( values[i]!='-1' and values[i+4]!='-1' and values[i+8]!='-1'):
 
                                         #check isn't a duplicate value (two adjacent strips...), lazy for now, just take first of two adjacent
-                                        if(xcoords and ((int)(values[i])-vcoords[-1]<=2 or (int)(values[i+4])-xcoords[-1]<=2 or int(values[i+8])-ucoords[-1]<=2)):
-                                                continue
+                                        #if(xcoords and ((int)(values[i])-vcoords[-1]<=2 or (int)(values[i+4])-xcoords[-1]<=2 or int(values[i+8])-ucoords[-1]<=2)):
+                                        #        continue
 
                                         # print (values[i],values[i+4],values[i+8])
                                         vcoords.append((int)(values[i]))
@@ -273,23 +249,8 @@ def PlotHitMap(name,allHits,XY,StripX,StripU,StripV,pitch,size,loop,theta):
                 myline.SetLineColor(1)
                 myline.SetLineWidth(1)
                 linearray.append(myline)
-                #myline.Draw("SAME")
-
-                #draw plane for U Plane
-                m1,c1=FindMandC(U,-theta,pitch)
-	        myline1= TLine(-xmax,m1*(-xmax)+c1,xmax,m1*(xmax)+c1 )
-                myline1.SetLineColor(1)
-                myline1.SetLineWidth(1)
-                linearray.append(RestrictLine(myline1, -xmax, -xmax, xmax, xmax,m1,c1))
-                #myline1.Draw("SAME")
-
-                #draw plane for V Plane
-                m2,c2=FindMandC(V,theta,pitch)
-	        myline2= TLine(-xmax,m2*(-xmax)+c2,xmax,m2*(xmax)+c2 )
-                myline2.SetLineColor(1)
-                myline2.SetLineWidth(1)
-                linearray.append(RestrictLine(myline2, -xmax, -xmax, xmax, xmax,m2,c2))
-                #myline2.Draw("SAME")
+                linearray.append(CreateTLines(xmax,U,-theta,pitch))
+                linearray.append(CreateTLines(xmax,V,theta,pitch))
 
         for line in linearray:
                 line.Draw("SAME")
@@ -363,8 +324,23 @@ def GetSumR(hit):
 
         return rSum
         
+def GetPixelArea(hit,rawAngle,pitch):
 
-def RemoveAmbiguities(inHits):
+        #find crossing points for XU,XV,and UV and assume triangular
+        rSum=0.0
+
+        XU=FindIntersect(hit[2],hit[3],-rawAngle,pitch)
+	XV=FindIntersect(hit[2],hit[4],rawAngle,pitch)
+	UV=FindUVIntersect(hit[3],hit[4],-rawAngle,rawAngle,pitch)
+
+        base=XU[1]-XV[1]
+        height=XU[0]-UV[0]
+
+        #print(XU[1]-XV[1])
+        return 0.5*base*height
+        
+
+def RemoveAmbiguities(inHits,rawAngle,pitch):
 
         XAcceptedHits=[]
         XUAcceptedHits=[]
@@ -374,7 +350,7 @@ def RemoveAmbiguities(inHits):
         for hitA in inHits:
                 passed=True
                 for hitB in inHits:
-                        if hitA[2]==hitB[2] and GetMaxR(hitA)>GetMaxR(hitB):
+                        if hitA[2]==hitB[2] and GetPixelArea(hitA,rawAngle,pitch)>GetPixelArea(hitB,rawAngle,pitch):
                                 passed=False
                 if passed==True:
                         XAcceptedHits.append(hitA)
@@ -383,7 +359,7 @@ def RemoveAmbiguities(inHits):
         for hitA in XAcceptedHits:
                 passed=True
                 for hitB in XAcceptedHits:
-                        if hitA[3]==hitB[3] and GetMaxR(hitA)>GetMaxR(hitB):
+                        if hitA[3]==hitB[3] and GetPixelArea(hitA,rawAngle,pitch)>GetPixelArea(hitB,rawAngle,pitch):
                                 passed=False
                 if passed==True:
                        XUAcceptedHits.append(hitA)           
@@ -392,7 +368,7 @@ def RemoveAmbiguities(inHits):
         for hitA in XUAcceptedHits:
                 passed=True
                 for hitB in XUAcceptedHits:
-                        if hitA[4]==hitB[4] and GetMaxR(hitA)>GetMaxR(hitB):
+                        if hitA[4]==hitB[4] and GetPixelArea(hitA,rawAngle,pitch)>GetPixelArea(hitB,rawAngle,pitch):
                                 passed=False
                 if passed==True:
                        XUVAcceptedHits.append(hitA)  
