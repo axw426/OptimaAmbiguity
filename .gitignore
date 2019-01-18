@@ -1,0 +1,7 @@
+#ignore file
+*.pyc
+*.C
+*.png
+*.txt
+*.root
+*~
