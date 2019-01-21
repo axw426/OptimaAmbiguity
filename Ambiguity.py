@@ -7,12 +7,12 @@ import time
 
 hf.SetSeed(2022)
 
-readExternal=False
+readExternal=True
 
 NLoops=1000
 size=10 #cm
 tolerance=1.01
-effTolerance=math.sqrt(2)
+effTolerance=2.0
 rawAngle=60
 saveStripMaps=False
 

@@ -23,14 +23,14 @@ def GetStripCoOrds(XY,pitch,rawAngle):
 	StripU=[]
 	StripV=[]
 	for coord in XY:
-		StripX.append((int)(coord[0]/pitch))
-		StripU.append((int)((coord[0]*math.cos(math.radians(rawAngle)) - coord[1]*math.sin(math.radians(rawAngle))) /pitch))
-		StripV.append((int)((coord[0]*math.cos(math.radians(-rawAngle)) - coord[1]*math.sin(math.radians(-rawAngle))) / pitch))
+		StripX.append((int)((coord[0]-50)/pitch))
+		StripU.append((int)(((coord[0]-50)*math.cos(math.radians(rawAngle)) - (coord[1]-50)*math.sin(math.radians(rawAngle))) /pitch))
+		StripV.append((int)(((coord[0]-50)*math.cos(math.radians(-rawAngle)) - (coord[1]-50)*math.sin(math.radians(-rawAngle))) / pitch))
 		#print(StripX[-1],StripU[-1],StripV[-1])
 	return StripX,StripU,StripV	
 
 def FindMandC(U,theta,pitch):
-     	xPrime=(U*pitch)+pitch/2.0
+     	xPrime=(U*pitch)#+pitch/2.0
 	
 	m=-1*math.tan(math.radians(90-theta))
 	c=xPrime/math.cos(math.radians(90-theta))
@@ -42,7 +42,7 @@ def FindIntersect(X,U,theta,pitch):
 	#in X frame, x*100+50 to get to middle of strip
 	#U line described by y=mx+c, where: m=-tan(90-Theta),c= X'/cos(90-theta)
 
-	x=(X*pitch)+pitch/2.0
+	x=(X*pitch)#+pitch/2.0
 	m,c=FindMandC(U,theta,pitch)
 	y=(m*x)+c
 
@@ -244,7 +244,7 @@ def PlotHitMap(name,allHits,XY,StripX,StripU,StripV,pitch,size,loop,theta):
         #draw the strips which were hit
         for X,U,V in zip(StripX,StripU,StripV):
                 #draw line for X plane
-                x=(X*pitch)+pitch/2.0
+                x=(X*pitch)#+pitch/2.0
                 myline=TLine(x,-xmax,x,xmax)
                 myline.SetLineColor(1)
                 myline.SetLineWidth(1)
