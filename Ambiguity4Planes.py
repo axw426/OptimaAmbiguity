@@ -9,16 +9,16 @@ hf.SetSeed(2022)
 
 readExternal=False
 
-NLoops=1000
+NLoops=500
 size=10 #cm
-tolerance=0.7
+tolerance=2.5
 effTolerance=2.0
-rawAngle=60
+rawAngle=45
 saveStripMaps=False
 
 xmax=size*5000
 
-gStyle.SetOptStat(0000)
+#gStyle.SetOptStat(0000)
 gROOT.SetBatch(True)
 
 if readExternal==True:
@@ -32,7 +32,7 @@ if readExternal==True:
         rawAngle=60
 
         #Set up histograms
-        MyFile =TFile("test.root","RECREATE");
+        MyFile =TFile("test4planes.root","RECREATE");
         binscale=1
         myHitMap=TH2F("myHitMap","Hit Locations",(int)(2*xmax/pitch)/binscale,-xmax,xmax,(int)(2*xmax/pitch)/binscale,-xmax,xmax)
         myRefinedHitMap=TH2F("myRefinedHitMap","Hit Locations",(int)(2*xmax/pitch)/binscale,-xmax,xmax,(int)(2*xmax/pitch)/binscale,-xmax,xmax)
@@ -84,28 +84,23 @@ else:
         ambiguityRateRefined.GetYaxis().SetTitle("nProtons")
 
 
-        for nProton in range(10,11):
+        for nProton in range(13,14):
                 for pitch in range (100,101,20):
 
                         nRawHits=0.0
                         nRefinedHits=0.0
-                        nRefinedHits2=0.0
 
                         nProton_RawEffCorrected=0.0
                         nProton_RefinedEffCorrected=0.0
-                        nProton_Refined2EffCorrected=0.0
 
                         #reset output file and setup histograms for loop
                         #MyFile =TFile("/disk/moose/bilpa/Optima/aw/Ambiguities/nP"+(str)(nProton)+"_pitch"+(str)(pitch)+"um_Array"+(str)(size)+"cm.root","RECREATE");
-                        MyFile =TFile("test.root","RECREATE");
+                        MyFile =TFile("test4planes.root","RECREATE");
                         hRawHits=TH1F("hRawHits","n Reconstructed Hits (Raw)",20,-4.5,24.5)
                         hRawEfficiency=TH1F("hRawEfficiency","Raw Efficiency",10,5,105)
 
                         hRefinedHits=TH1F("hRefinedHits","n Reconstructed Hits (Refined)",20,-4.5,24.5)
                         hRefinedEfficiency=TH1F("hRefinedEfficiency","Refined Efficiency",10,5,105)
-
-                        hRefinedHits2=TH1F("hRefinedHits2","n Reconstructed Hits (Refined2)",20,-4.5,24.5)
-                        hRefinedEfficiency2=TH1F("hRefinedEfficiency2","Refined Efficiency",10,5,105)
 
                         myHitMap=TH2F("myHitMap","Hit Locations",(int)(2*xmax/pitch),-xmax,xmax,(int)(2*xmax/pitch),-xmax,xmax)
 
@@ -118,15 +113,15 @@ else:
                                 XY=hf.GetRandomXY(nProton,size)
 
                                 #convert points into a strip number for each layer 
-                                StripX,StripU,StripV=hf.GetStripCoOrds(XY,pitch,rawAngle)
+                                StripX,StripU,StripV,StripY=hf.GetStripCoOrds4Planes(XY,pitch,rawAngle)
 
                                 #cycle through all strip combinations, find intersections of pairs of planes, see if they are within tolerance of each other
                                 #returns hit objects of form (XCoord,YCoord,stripX,stripU,stripV,[radial distance to intersections])
-                                allHits=hf.FindOverlaps(StripX,StripU,StripV,pitch,rawAngle,tolerance)
+                                allHits=hf.FindOverlaps4Planes(StripX,StripU,StripV,StripY,pitch,rawAngle,tolerance)
                                 nRawHits+=len(allHits)
                                 hRawHits.Fill(len(allHits))
                                 if saveStripMaps:
-                                        hf.PlotHitMap("RawHits",allHits,XY,StripX,StripU,StripV,pitch,size,i,rawAngle)
+                                        hf.PlotHitMap4Planes("RawHits",allHits,XY,StripX,StripU,StripV,StripY,pitch,size,i,rawAngle)
                                 rawEff=hf.GetEfficiency(allHits,XY,pitch,effTolerance)
                                 hRawEfficiency.Fill(100*rawEff)
                                 nProton_RawEffCorrected+=nProton*rawEff
@@ -139,42 +134,26 @@ else:
                                 nRefinedHits+=len(refinedHits)
                                 hRefinedHits.Fill(len(refinedHits))
                                 if saveStripMaps:
-                                        hf.PlotHitMap("RefinedHits",refinedHits,XY,StripX,StripU,StripV,pitch,size,i,rawAngle)
+                                        hf.PlotHitMap4Planes("RefinedHits",refinedHits,XY,StripX,StripU,StripV,StripY,pitch,size,i,rawAngle)
                                 refinedEff=hf.GetEfficiency(refinedHits,XY,pitch,effTolerance)
                                 hRefinedEfficiency.Fill(100*refinedEff)
                                 nProton_RefinedEffCorrected+=nProton*refinedEff
 
-                                #Try removing hits where same strip is used multiple times
-                                #refinedHits2=hf.RemoveAmbiguities(refinedHits,rawAngle,pitch)
-                                #nRefinedHits2+=len(refinedHits2)
-                                #hRefinedHits2.Fill(len(refinedHits2))
-                                #if saveStripMaps:
-                                #        hf.PlotHitMap("RefinedHits2",refinedHits2,XY,StripX,StripU,StripV,pitch,size,i,rawAngle)
-                                #refinedEff2=hf.GetEfficiency(refinedHits2,XY,pitch,effTolerance)
-                                #hRefinedEfficiency2.Fill(100*refinedEff2)
-                                #nProton_Refined2EffCorrected+=nProton*refinedEff2
 
 
 
                         rawAmbiguity=100*(nRawHits-(NLoops*nProton))/(NLoops*nProton)
                         refinedAmbiguity=100*(nRefinedHits-(NLoops*nProton))/(NLoops*nProton)
-                        #refinedAmbiguity2=100*(nRefinedHits2-(NLoops*nProton))/(NLoops*nProton)
                         #rawAmbiguity_Corrected=100*(nRawHits-(nProton_RawEffCorrected))/(nProton_RawEffCorrected)
                         #refinedAmbiguity_Corrected=100*(nRefinedHits-(nProton_RefinedEffCorrected))/(nProton_RefinedEffCorrected)
-                        #refinedAmbiguity2_Corrected=100*(nRefinedHits2-(nProton_Refined2EffCorrected))/(nProton_Refined2EffCorrected)
                         
                         print "nProton="+(str)(nProton)+", pitch="+(str)(pitch)+", rawAmbiguity="+(str)(rawAmbiguity)+"%"+", refinedAmbiguity="+(str)(refinedAmbiguity)
-                        print "Efficiency: raw="+(str)(hRawEfficiency.GetMean())+", refined="+(str)(hRefinedEfficiency.GetMean())
-                        #print "Efficiency corrected: rawAmbiguity="+(str)(rawAmbiguity_Corrected)+"%"+", refinedAmbiguity="+(str)(refinedAmbiguity_Corrected)
-                        # print "nProton="+(str)(nProton)+", pitch="+(str)(pitch)+", rawAmbiguity="+(str)(rawAmbiguity)+"%"+", refinedAmbiguity="+(str)(refinedAmbiguity)+", refinedAmbiguity2="+(str)(refinedAmbiguity2)
-                        #print "Efficiency: raw="+(str)(hRawEfficiency.GetMean())+", refined="+(str)(hRefinedEfficiency.GetMean())+", refined2="+(str)(hRefinedEfficiency2.GetMean())
-                        #print "Efficiency corrected: rawAmbiguity="+(str)(rawAmbiguity_Corrected)+"%"+", refinedAmbiguity="+(str)(refinedAmbiguity_Corrected)+", refinedAmbiguity2="+(str)(refinedAmbiguity2_Corrected)
+                       # print "Efficiency: raw="+(str)(hRawEfficiency.GetMean())+", refined="+(str)(hRefinedEfficiency.GetMean())
+                       # print "Efficiency corrected: rawAmbiguity="+(str)(rawAmbiguity_Corrected)+"%"+", refinedAmbiguity="+(str)(refinedAmbiguity_Corrected)
                         hRawHits.Write()
                         hRawEfficiency.Write()
                         hRefinedHits.Write()
                         hRefinedEfficiency.Write()
-                        hRefinedHits2.Write()
-                        hRefinedEfficiency2.Write()
                         myHitMap.Write()
                         MyFile.Close()
                         ambiguityRate.Fill(pitch,nProton,rawAmbiguity)
@@ -182,8 +161,8 @@ else:
 
         mycanvas = TCanvas( "c1", "Ambiguities", 550,195,800,700 )
         ambiguityRate.Draw("COLZText")
-        mycanvas.SaveAs("outputAmbiguities_"+(str)(size)+"cm.C")
-        mycanvas.SaveAs("outputAmbiguities_"+(str)(size)+"cm.png")
+        mycanvas.SaveAs("outputAmbiguities4Plane_"+(str)(size)+"cm.C")
+        mycanvas.SaveAs("outputAmbiguities4Plane_"+(str)(size)+"cm.png")
         ambiguityRateRefined.Draw("COLZTEXT")
-        mycanvas.SaveAs("outputAmbiguitiesRefined_"+(str)(size)+"cm.C")
-        mycanvas.SaveAs("outputAmbiguitiesRefined_"+(str)(size)+"cm.png")
+        mycanvas.SaveAs("outputAmbiguitiesRefined4Plane_"+(str)(size)+"cm.C")
+        mycanvas.SaveAs("outputAmbiguitiesRefined4Plane_"+(str)(size)+"cm.png")

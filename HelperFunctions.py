@@ -11,8 +11,8 @@ def GetRandomXY(nProtons,size):
 	for x in range(nProtons):
 		X=random.uniform(-size*5000.0,size*5000.0) #10000 um per cm
 		Y=random.uniform(-size*5000.0,size*5000.0) #10000 um per cm
-	#	X=random.gauss(3000.0,2000)
-	#	Y=random.gauss(3000.0,2000)
+	#	X=random.gauss(0.0,6000)
+	#	Y=random.gauss(0.0,6000)
                 XY.append([X,Y])
 	        #print X,Y
 	return XY
@@ -28,6 +28,31 @@ def GetStripCoOrds(XY,pitch,rawAngle):
 		StripV.append((int)(((coord[0]-50)*math.cos(math.radians(-rawAngle)) - (coord[1]-50)*math.sin(math.radians(-rawAngle))) / pitch))
 		#print(StripX[-1],StripU[-1],StripV[-1])
 	return StripX,StripU,StripV	
+
+#convert points into a strip number for each layer assuming pitch of 100um
+def GetPixelCoOrds(XY,pitch):
+        coords=[]
+	for coord in XY:
+		cellX=(int)((coord[0]-(pitch/2.0))/pitch)
+		cellY=(int)((coord[1]-(pitch/2.0))/pitch)
+                coords.append([cellX,cellY])
+                
+	return coords
+
+
+def GetStripCoOrds4Planes(XY,pitch,rawAngle):
+	StripX=[]
+	StripU=[]
+	StripV=[]
+	StripY=[]
+	for coord in XY:
+		StripX.append((int)((coord[0]-50)/pitch))
+		StripU.append((int)(((coord[0]-50)*math.cos(math.radians(rawAngle)) - (coord[1]-50)*math.sin(math.radians(rawAngle))) /pitch))
+		StripV.append((int)(((coord[0]-50)*math.cos(math.radians(2*rawAngle)) - (coord[1]-50)*math.sin(math.radians(2*rawAngle))) / pitch))
+		StripY.append((int)(((coord[0]-50)*math.cos(math.radians(3*rawAngle)) - (coord[1]-50)*math.sin(math.radians(3*rawAngle))) / pitch))
+		#print(StripX[-1],StripU[-1],StripV[-1])
+	return StripX,StripU,StripV,StripY	
+
 
 def FindMandC(U,theta,pitch):
      	xPrime=(U*pitch)#+pitch/2.0
@@ -140,7 +165,22 @@ def checkForDuplicates(xmean,ymean,allHits,tolerance):
                         return True
         return False
 
-	
+#def CheckStripHalf(xmean,ymean,X,U,V,rawAngle,pitch):
+ #       passed=True
+  #      if ytrue*ymean<0:
+   #             passed=False
+#
+ #       yU=xmean*tan(rawAngle)
+  #      if ytrue*(ymean-yU)<0:
+  #              passed=False
+#
+ #       yV=xmean*tan(-rawAngle)
+  #      if ytrue*(ymean-yV)<0:
+   #             passed=False
+#
+ #       return passed
+
+
 #cycle through all strip combinations and see which create an overlap- will want to define a central line for each strip and work out if they intersect 
 def FindOverlaps(StripX,StripU,StripV,pitch,rawAngle,tolerance):
 
@@ -162,6 +202,29 @@ def FindOverlaps(StripX,StripU,StripV,pitch,rawAngle,tolerance):
 
 	return allHits
 
+def FindOverlaps4Planes(StripX,StripU,StripV,StripY,pitch,rawAngle,tolerance):
+
+        allHits=[]
+        
+	#find the Y coordinate where the X and U or V intercept and see if they are close
+	for X in StripX:
+		for U in StripU:
+			for V in StripV:
+			        for Y in StripY:
+                                        xycoords=[]
+                                        xycoords.append(FindIntersect(X,U,-rawAngle,pitch))
+				        xycoords.append(FindIntersect(X,V,-rawAngle*2,pitch))
+				        xycoords.append(FindIntersect(X,Y,-rawAngle*3,pitch))
+                                        
+                                        xycoords.append(FindUVIntersect(U,V,-rawAngle,-rawAngle*2,pitch))
+                                        xycoords.append(FindUVIntersect(U,Y,-rawAngle,-rawAngle*3,pitch))
+                                        xycoords.append(FindUVIntersect(V,Y,-rawAngle*2,-rawAngle*3,pitch))
+                                        
+				        passed,xmean,ymean,rValues=CheckProximity(xycoords,tolerance,pitch)
+                                        if passed==True:
+                                                allHits.append([xmean,ymean,X,U,V,Y,rValues])
+
+	return allHits
 
 def ReadXUVStripCoOrds(inFile):
         hitsByTimestamp=[]
@@ -249,8 +312,56 @@ def PlotHitMap(name,allHits,XY,StripX,StripU,StripV,pitch,size,loop,theta):
                 myline.SetLineColor(1)
                 myline.SetLineWidth(1)
                 linearray.append(myline)
-                linearray.append(CreateTLines(xmax,U,-theta,pitch))
-                linearray.append(CreateTLines(xmax,V,theta,pitch))
+                linearray.append(CreateTLines(xmax,U,theta,pitch))
+                linearray.append(CreateTLines(xmax,V,-theta,pitch))
+
+        for line in linearray:
+                line.Draw("SAME")
+                               
+
+        #draw where protons really hit
+        truth=TH2F("truth"+(str)(loop),"Hit Locations",1000,-xmax,xmax,1000,-xmax,xmax)
+        truth.SetMarkerSize(2)
+        truth.SetMarkerStyle(23)
+        truth.SetMarkerColor(2)
+        for coords in XY:
+                truth.Fill(coords[0],coords[1])
+        truth.Draw("SAME")
+
+
+        canvas1.Write(name+(str)(loop))
+
+def PlotHitMap4Planes(name,allHits,XY,StripX,StripU,StripV,StripY,pitch,size,loop,theta):
+
+        #print("Entering plot hit map 4 planes")
+        #print len(StripY)
+        canvas1 = TCanvas( 'c1'+(str)(loop), "mycanvas", 200, 10, 700, 500 )
+        xmax=size*5000
+
+        #draw reconstructed points
+        rawmeasured=TH2F(name+(str)(loop),"Hit Locations",1000,-xmax,xmax,1000,-xmax,xmax)
+        rawmeasured.GetXaxis().SetTitle("X position (#mum)")
+        rawmeasured.GetYaxis().SetTitle("Y position (#mum)")
+        rawmeasured.SetMarkerColor(4)
+        rawmeasured.SetMarkerSize(2)
+        rawmeasured.SetMarkerStyle(8)
+        for hit in allHits:
+               rawmeasured.Fill(hit[0],hit[1])
+        rawmeasured.Draw("")
+
+        linearray=[]
+        #draw the strips which were hit
+        for X,U,V,Y in zip(StripX,StripU,StripV,StripY):
+         #       print (X,U,V,Y)
+                #draw line for X plane
+                x=(X*pitch)#+pitch/2.0
+                myline=TLine(x,-xmax,x,xmax)
+                myline.SetLineColor(1)
+                myline.SetLineWidth(1)
+                linearray.append(myline)
+                linearray.append(CreateTLines(xmax,U,theta,pitch))
+                linearray.append(CreateTLines(xmax,V,2*theta,pitch))
+                linearray.append(CreateTLines(xmax,Y,3*theta,pitch))
 
         for line in linearray:
                 line.Draw("SAME")
