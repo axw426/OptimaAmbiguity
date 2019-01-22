@@ -23,9 +23,9 @@ def GetStripCoOrds(XY,pitch,rawAngle):
 	StripU=[]
 	StripV=[]
 	for coord in XY:
-		StripX.append((int)((coord[0]-50)/pitch))
-		StripU.append((int)(((coord[0]-50)*math.cos(math.radians(rawAngle)) - (coord[1]-50)*math.sin(math.radians(rawAngle))) /pitch))
-		StripV.append((int)(((coord[0]-50)*math.cos(math.radians(-rawAngle)) - (coord[1]-50)*math.sin(math.radians(-rawAngle))) / pitch))
+		StripX.append((int)((coord[0]-0.5*pitch)/pitch))
+		StripU.append((int)(((coord[0]-0.5*pitch)*math.cos(math.radians(rawAngle)) - (coord[1]-0.5*pitch)*math.sin(math.radians(rawAngle))) /pitch))
+		StripV.append((int)(((coord[0]-0.5*pitch)*math.cos(math.radians(-rawAngle)) - (coord[1]-0.5*pitch)*math.sin(math.radians(-rawAngle))) / pitch))
 		#print(StripX[-1],StripU[-1],StripV[-1])
 	return StripX,StripU,StripV	
 
