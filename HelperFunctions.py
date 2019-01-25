@@ -17,18 +17,51 @@ def GetRandomXY(nProtons,size):
 	        #print X,Y
 	return XY
 
+def ConvertXYToStrip(coord,pitch,rawAngle):
+
+        return (int)(((coord[0]-50)*math.cos(math.radians(rawAngle)) - (coord[1]-50)*math.sin(math.radians(rawAngle))) /pitch)
+
+def CheckStripHalf(coord,pitch,rawAngle):
+
+        y= (int)(((coord[0]-50)*math.sin(math.radians(rawAngle)) + (coord[1]-50)*math.cos(math.radians(rawAngle))) /pitch)
+
+        return y
+        #if y>=0:
+        #        return 1.0
+        #else:
+        #        return -1.0
 #convert points into a strip number for each layer assuming pitch of 100um
-def GetStripCoOrds(XY,pitch,rawAngle):
+def GetStripCoOrds(XY,pitch,angles):
 	StripX=[]
 	StripU=[]
 	StripV=[]
-	for coord in XY:
-		StripX.append((int)((coord[0]-0.5*pitch)/pitch))
-		StripU.append((int)(((coord[0]-0.5*pitch)*math.cos(math.radians(rawAngle)) - (coord[1]-0.5*pitch)*math.sin(math.radians(rawAngle))) /pitch))
-		StripV.append((int)(((coord[0]-0.5*pitch)*math.cos(math.radians(-rawAngle)) - (coord[1]-0.5*pitch)*math.sin(math.radians(-rawAngle))) / pitch))
-		#print(StripX[-1],StripU[-1],StripV[-1])
-	return StripX,StripU,StripV	
+	StripY=[]
+        StripHalfX=[]
+        StripHalfU=[]
+        StripHalfV=[]
+        StripHalfY=[]
+        
+        for coord in XY:
+                StripX.append(ConvertXYToStrip(coord,pitch,angles[0]))
+		StripU.append(ConvertXYToStrip(coord,pitch,angles[1]))
+                StripHalfX.append(CheckStripHalf(coord,pitch,angles[0]))
+                StripHalfU.append(CheckStripHalf(coord,pitch,angles[1]))
 
+        Strips=[StripX,StripU,StripHalfX,StripHalfU]
+
+        if len(angles)>2:
+                for coord in XY:
+                        StripV.append(ConvertXYToStrip(coord,pitch,angles[2]))
+                        StripHalfV.append(CheckStripHalf(coord,pitch,angles[2]))
+                Strips=[StripX,StripU,StripV,StripHalfX,StripHalfU,StripHalfV]
+                        
+        if len(angles)>3:
+                for coord in XY:
+                        StripY.append(ConvertXYToStrip(coord,pitch,angles[3]))
+                        StripHalfY.append(CheckStripHalf(coord,pitch,angles[3]))
+	        Strips= [StripX,StripU,StripV,StripY,StripHalfX,StripHalfU,StripHalfV,StripHalfY]	
+
+        return Strips
 #convert points into a strip number for each layer assuming pitch of 100um
 def GetPixelCoOrds(XY,pitch):
         coords=[]
@@ -38,20 +71,6 @@ def GetPixelCoOrds(XY,pitch):
                 coords.append([cellX,cellY])
                 
 	return coords
-
-
-def GetStripCoOrds4Planes(XY,pitch,rawAngle):
-	StripX=[]
-	StripU=[]
-	StripV=[]
-	StripY=[]
-	for coord in XY:
-		StripX.append((int)((coord[0]-50)/pitch))
-		StripU.append((int)(((coord[0]-50)*math.cos(math.radians(rawAngle)) - (coord[1]-50)*math.sin(math.radians(rawAngle))) /pitch))
-		StripV.append((int)(((coord[0]-50)*math.cos(math.radians(2*rawAngle)) - (coord[1]-50)*math.sin(math.radians(2*rawAngle))) / pitch))
-		StripY.append((int)(((coord[0]-50)*math.cos(math.radians(3*rawAngle)) - (coord[1]-50)*math.sin(math.radians(3*rawAngle))) / pitch))
-		#print(StripX[-1],StripU[-1],StripV[-1])
-	return StripX,StripU,StripV,StripY	
 
 
 def FindMandC(U,theta,pitch):
@@ -64,7 +83,7 @@ def FindMandC(U,theta,pitch):
 
 def FindIntersect(X,U,theta,pitch):
 
-	#in X frame, x*100+50 to get to middle of strip
+	#in X frame, x*100 to get to middle of strip
 	#U line described by y=mx+c, where: m=-tan(90-Theta),c= X'/cos(90-theta)
 
 	x=(X*pitch)#+pitch/2.0
@@ -77,10 +96,17 @@ def FindIntersect(X,U,theta,pitch):
 	
 def FindUVIntersect(U,V,uAngle,vAngle,pitch):
 
-	#define y=mx+c for U and V in frame of X layer
-        m1,c1=FindMandC(U,uAngle,pitch)
+        if uAngle==0:
+                return FindIntersect(U,V,-vAngle,pitch)
+
+        if vAngle==0:
+                return FindIntersect(V,U,-uAngle,pitch)
+
+        #define y=mx+c for U and V in frame of X layer
+
+        m1,c1=FindMandC(U,-uAngle,pitch)
 	
-        m2,c2=FindMandC(V,vAngle,pitch)
+        m2,c2=FindMandC(V,-vAngle,pitch)
 	
 	Xintercept=(c2-c1)/(m1-m2)
 	Yintercept1=(m1*Xintercept) + c1
@@ -165,66 +191,99 @@ def checkForDuplicates(xmean,ymean,allHits,tolerance):
                         return True
         return False
 
-#def CheckStripHalf(xmean,ymean,X,U,V,rawAngle,pitch):
- #       passed=True
-  #      if ytrue*ymean<0:
-   #             passed=False
-#
- #       yU=xmean*tan(rawAngle)
-  #      if ytrue*(ymean-yU)<0:
-  #              passed=False
-#
- #       yV=xmean*tan(-rawAngle)
-  #      if ytrue*(ymean-yV)<0:
-   #             passed=False
-#
- #       return passed
+def CheckHalves(coord,pitch,halves,angles):
+
+        passed=True
+
+        for half,angle in zip(halves,angles):
+                #check that y coordinates in planes frame have same sign
+                if half*CheckStripHalf(coord,pitch,angle)<0:
+                     passed=False
+
+        return passed
+             
 
 
-#cycle through all strip combinations and see which create an overlap- will want to define a central line for each strip and work out if they intersect 
-def FindOverlaps(StripX,StripU,StripV,pitch,rawAngle,tolerance):
+def FindOverlaps2Planes(Strips,pitch,angles,tolerance,useHalfStrips):
 
         allHits=[]
         
 	#find the Y coordinate where the X and U or V intercept and see if they are close
-	for X in StripX:
-		for U in StripU:
-			for V in StripV:
-                                xycoords=[]
-				xycoords.append(FindIntersect(X,U,-rawAngle,pitch))
-				xycoords.append(FindIntersect(X,V,rawAngle,pitch))
-				xycoords.append(FindUVIntersect(U,V,-rawAngle,rawAngle,pitch))
-				passed,xmean,ymean,rValues=CheckProximity(xycoords,tolerance,pitch)
-                                if passed==True:
-                                        allHits.append([xmean,ymean,X,U,V,rValues])
-                                #else:
-                                 #       print(X,U,V,xycoords[0],xycoords[1],xycoords[2])
+	for X,xHalf in zip(Strips[0],Strips[2]):
+		for U,uHalf in zip(Strips[1],Strips[3]):
+
+                        xmean=X*pitch
+                        ymean=U*pitch
+
+                        if useHalfStrips and CheckHalves([xmean,ymean],pitch,[xHalf,uHalf],angles)==False:
+                                continue
+                        
+                        allHits.append([xmean,ymean,[X,U],[0]])
 
 	return allHits
 
-def FindOverlaps4Planes(StripX,StripU,StripV,StripY,pitch,rawAngle,tolerance):
+
+def FindOverlaps3Planes(Strips,pitch,angles,tolerance,useHalfStrips):
 
         allHits=[]
         
 	#find the Y coordinate where the X and U or V intercept and see if they are close
-	for X in StripX:
-		for U in StripU:
-			for V in StripV:
-			        for Y in StripY:
+	for X,xHalf in zip(Strips[0],Strips[3]):
+		for U,uHalf in zip(Strips[1],Strips[4]):
+			   for V,vHalf in zip(Strips[2],Strips[5]):
+                                xycoords=[]
+				xycoords.append(FindUVIntersect(X,U,angles[0],angles[1],pitch))
+				xycoords.append(FindUVIntersect(X,V,angles[0],angles[2],pitch))
+				xycoords.append(FindUVIntersect(U,V,angles[1],angles[2],pitch))
+
+				passed,xmean,ymean,rValues=CheckProximity(xycoords,tolerance,pitch)
+
+                                if passed==True:
+                                        if useHalfStrips and CheckHalves([xmean,ymean],pitch,[xHalf,uHalf,vHalf],angles)==False:
+                                                continue
+                                        allHits.append([xmean,ymean,[X,U,V],rValues])
+
+	return allHits
+
+def FindOverlaps4Planes(Strips,pitch,angles,tolerance,useHalfStrips):
+
+        allHits=[]
+        
+	#find the Y coordinate where the X and U or V intercept and see if they are close
+	for X,xHalf in Strips[0],Strips[4]:
+		for U,uHalf in Strips[1],Strips[5]:
+			for V,vHalf in Strips[2],Strips[6]:
+			        for Y,yHalf in Strips[3],Strips[7]:
                                         xycoords=[]
-                                        xycoords.append(FindIntersect(X,U,-rawAngle,pitch))
-				        xycoords.append(FindIntersect(X,V,-rawAngle*2,pitch))
-				        xycoords.append(FindIntersect(X,Y,-rawAngle*3,pitch))
-                                        
-                                        xycoords.append(FindUVIntersect(U,V,-rawAngle,-rawAngle*2,pitch))
-                                        xycoords.append(FindUVIntersect(U,Y,-rawAngle,-rawAngle*3,pitch))
-                                        xycoords.append(FindUVIntersect(V,Y,-rawAngle*2,-rawAngle*3,pitch))
-                                        
+
+                                        xycoords.append(FindUVIntersect(X,U,angles[0],angles[1],pitch))
+				        xycoords.append(FindUVIntersect(X,V,angles[0],angles[2],pitch))
+				        xycoords.append(FindUVIntersect(X,Y,angles[0],angles[3],pitch))
+
+                                        xycoords.append(FindUVIntersect(U,V,angles[1],angles[2],pitch))
+                                        xycoords.append(FindUVIntersect(U,Y,angles[1],angles[3],pitch))
+
+                                        xycoords.append(FindUVIntersect(V,Y,angles[2],angles[3],pitch))
+
 				        passed,xmean,ymean,rValues=CheckProximity(xycoords,tolerance,pitch)
                                         if passed==True:
-                                                allHits.append([xmean,ymean,X,U,V,Y,rValues])
+                                                if useHalfStrips and CheckHalves([xmean,ymean],pitch,[xHalf,uHalf,vHalf,yHalf],angles)==False:
+                                                        continue
+                                                allHits.append([xmean,ymean,[X,U,V,Y],rValues])
 
 	return allHits
+
+#cycle through all strip combinations and see which create an overlap- will want to define a central line for each strip and work out if they intersect 
+def FindOverlaps(Strips,pitch,angles,tolerance,useHalfStrips):
+
+        nPlanes=len(angles)
+        if nPlanes==2:
+                return FindOverlaps2Planes(Strips,pitch,angles,tolerance,useHalfStrips) 
+        elif nPlanes==3:
+                return FindOverlaps3Planes(Strips,pitch,angles,tolerance,useHalfStrips)
+        elif nPlanes==4:
+                return FindOverlaps4Planes(Strips,pitch,angles,tolerance,useHalfStrips)  
+
 
 def ReadXUVStripCoOrds(inFile):
         hitsByTimestamp=[]
@@ -287,7 +346,7 @@ def ReadXUVStripCoOrds(inFile):
         hVStrips.Write()
         return hitsByTimestamp
 
-def PlotHitMap(name,allHits,XY,StripX,StripU,StripV,pitch,size,loop,theta):
+def PlotHitMap(name,allHits,XY,Strips,pitch,size,loop,angles):
 
         canvas1 = TCanvas( 'c1'+(str)(loop), "mycanvas", 200, 10, 700, 500 )
         xmax=size*5000
@@ -305,16 +364,31 @@ def PlotHitMap(name,allHits,XY,StripX,StripU,StripV,pitch,size,loop,theta):
 
         linearray=[]
         #draw the strips which were hit
-        for X,U,V in zip(StripX,StripU,StripV):
-                #draw line for X plane
-                x=(X*pitch)#+pitch/2.0
-                myline=TLine(x,-xmax,x,xmax)
-                myline.SetLineColor(1)
-                myline.SetLineWidth(1)
-                linearray.append(myline)
-                linearray.append(CreateTLines(xmax,U,theta,pitch))
-                linearray.append(CreateTLines(xmax,V,-theta,pitch))
+        nPlanes=len(angles)
 
+        if nPlanes==3:
+                for X,U,V in zip(Strips[0],Strips[1],Strips[2]):
+                        #draw line for X plane
+                        x=(X*pitch)#+pitch/2.0
+                        myline=TLine(x,-xmax,x,xmax)
+                        myline.SetLineColor(1)
+                        myline.SetLineWidth(1)
+                        linearray.append(myline)
+                        linearray.append(CreateTLines(xmax,U,angles[1],pitch))
+                        linearray.append(CreateTLines(xmax,V,angles[2],pitch))
+
+        if nPlanes==4:
+                for X,U,V,Y in zip(Strips[0],Strips[1],Strips[2],Strips[3]):
+                        #draw line for X plane
+                        x=(X*pitch)#+pitch/2.0
+                        myline=TLine(x,-xmax,x,xmax)
+                        myline.SetLineColor(1)
+                        myline.SetLineWidth(1)
+                        linearray.append(myline)
+                        linearray.append(CreateTLines(xmax,U,angles[1],pitch))
+                        linearray.append(CreateTLines(xmax,V,angles[2],pitch))
+                        linearray.append(CreateTLines(xmax,Y,angles[3],pitch))
+                        
         for line in linearray:
                 line.Draw("SAME")
                                
@@ -330,55 +404,6 @@ def PlotHitMap(name,allHits,XY,StripX,StripU,StripV,pitch,size,loop,theta):
 
 
         canvas1.Write(name+(str)(loop))
-
-def PlotHitMap4Planes(name,allHits,XY,StripX,StripU,StripV,StripY,pitch,size,loop,theta):
-
-        #print("Entering plot hit map 4 planes")
-        #print len(StripY)
-        canvas1 = TCanvas( 'c1'+(str)(loop), "mycanvas", 200, 10, 700, 500 )
-        xmax=size*5000
-
-        #draw reconstructed points
-        rawmeasured=TH2F(name+(str)(loop),"Hit Locations",1000,-xmax,xmax,1000,-xmax,xmax)
-        rawmeasured.GetXaxis().SetTitle("X position (#mum)")
-        rawmeasured.GetYaxis().SetTitle("Y position (#mum)")
-        rawmeasured.SetMarkerColor(4)
-        rawmeasured.SetMarkerSize(2)
-        rawmeasured.SetMarkerStyle(8)
-        for hit in allHits:
-               rawmeasured.Fill(hit[0],hit[1])
-        rawmeasured.Draw("")
-
-        linearray=[]
-        #draw the strips which were hit
-        for X,U,V,Y in zip(StripX,StripU,StripV,StripY):
-         #       print (X,U,V,Y)
-                #draw line for X plane
-                x=(X*pitch)#+pitch/2.0
-                myline=TLine(x,-xmax,x,xmax)
-                myline.SetLineColor(1)
-                myline.SetLineWidth(1)
-                linearray.append(myline)
-                linearray.append(CreateTLines(xmax,U,theta,pitch))
-                linearray.append(CreateTLines(xmax,V,2*theta,pitch))
-                linearray.append(CreateTLines(xmax,Y,3*theta,pitch))
-
-        for line in linearray:
-                line.Draw("SAME")
-                               
-
-        #draw where protons really hit
-        truth=TH2F("truth"+(str)(loop),"Hit Locations",1000,-xmax,xmax,1000,-xmax,xmax)
-        truth.SetMarkerSize(2)
-        truth.SetMarkerStyle(23)
-        truth.SetMarkerColor(2)
-        for coords in XY:
-                truth.Fill(coords[0],coords[1])
-        truth.Draw("SAME")
-
-
-        canvas1.Write(name+(str)(loop))
-
 
 def GetSeparation(hit1,hit2):
 
@@ -387,7 +412,6 @@ def GetSeparation(hit1,hit2):
 def RemoveAdjacentHits(allHits,tolerance,pitch):
 
         #thou must not edit python lists while iterating over them...
-#        duplicatePositions=[]
         refinedHits=[]
 
         for i in allHits:
@@ -404,45 +428,30 @@ def RemoveAdjacentHits(allHits,tolerance,pitch):
 
 def GetEfficiency(allHits,XY,pitch,tolerance):
 
+        #check if there is a reconstructed hit within tolerance of the true hit positions
         nExpected=len(XY)
         nFound=0.0
 
         for true in XY:
                 passed=False
-                for hit in allHits:
-                        if math.sqrt((true[0]-hit[0])**2 + (true[1]-hit[1])**2)<pitch*tolerance:
+                for reco in allHits:
+                        if math.sqrt((true[0]-reco[0])**2 + (true[1]-reco[1])**2)<pitch*tolerance:
                                 passed=True
                 if passed ==True:
-                        nFound+=1
+                        nFound+=1.0
 
 
-        return nFound/nExpected
+        return nFound/(float)(nExpected)
 
-def GetMaxR(hit):
-
-        rMin=-1.0
-        for r in hit[5]:
-              if r>rMin:
-                      rMin=r
-
-        return rMin
-
-def GetSumR(hit):
-
-        rSum=0.0
-        for r in hit[5]:
-                rSum+=r
-
-        return rSum
-        
-def GetPixelArea(hit,rawAngle,pitch):
+def GetPixelArea(hit,angles,pitch):
 
         #find crossing points for XU,XV,and UV and assume triangular
         rSum=0.0
 
-        XU=FindIntersect(hit[2],hit[3],-rawAngle,pitch)
-	XV=FindIntersect(hit[2],hit[4],rawAngle,pitch)
-	UV=FindUVIntersect(hit[3],hit[4],-rawAngle,rawAngle,pitch)
+        Strips=hit[2]
+	XU=FindUVIntersect(Strips[0],Strips[1],angles[0],angles[1],pitch)
+	XV=FindUVIntersect(Strips[0],Strips[2],angles[0],angles[2],pitch)
+	UV=FindUVIntersect(Strips[1],Strips[2],angles[1],angles[2],pitch)
 
         base=XU[1]-XV[1]
         height=XU[0]-UV[0]
@@ -461,7 +470,7 @@ def RemoveAmbiguities(inHits,rawAngle,pitch):
         for hitA in inHits:
                 passed=True
                 for hitB in inHits:
-                        if hitA[2]==hitB[2] and GetPixelArea(hitA,rawAngle,pitch)>GetPixelArea(hitB,rawAngle,pitch):
+                        if hitA[2][0]==hitB[2][0] and GetPixelArea(hitA,rawAngle,pitch)>GetPixelArea(hitB,rawAngle,pitch):
                                 passed=False
                 if passed==True:
                         XAcceptedHits.append(hitA)
@@ -470,7 +479,7 @@ def RemoveAmbiguities(inHits,rawAngle,pitch):
         for hitA in XAcceptedHits:
                 passed=True
                 for hitB in XAcceptedHits:
-                        if hitA[3]==hitB[3] and GetPixelArea(hitA,rawAngle,pitch)>GetPixelArea(hitB,rawAngle,pitch):
+                        if hitA[2][1]==hitB[2][1] and GetPixelArea(hitA,rawAngle,pitch)>GetPixelArea(hitB,rawAngle,pitch):
                                 passed=False
                 if passed==True:
                        XUAcceptedHits.append(hitA)           
@@ -479,7 +488,7 @@ def RemoveAmbiguities(inHits,rawAngle,pitch):
         for hitA in XUAcceptedHits:
                 passed=True
                 for hitB in XUAcceptedHits:
-                        if hitA[4]==hitB[4] and GetPixelArea(hitA,rawAngle,pitch)>GetPixelArea(hitB,rawAngle,pitch):
+                        if hitA[2][2]==hitB[2][2] and GetPixelArea(hitA,rawAngle,pitch)>GetPixelArea(hitB,rawAngle,pitch):
                                 passed=False
                 if passed==True:
                        XUVAcceptedHits.append(hitA)  
