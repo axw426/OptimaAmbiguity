@@ -7,20 +7,20 @@ from ROOT import gROOT, TCanvas, TF1, TFile, gStyle,TH2F, TH1F
 import time
 
 hf.SetSeed(2022)
-saveStripMaps=False
-useHalfStrips=True
+saveStripMaps=True
+useHalfStrips=False
 
-NLoops=1000
+NLoops=10
 size=10 #cm
 
 
 #X-Y
-#tolerance=0.0 #no need for tolerance as X-Y guaranteed to overlap
-#angles=[0,90]
+tolerance=0.0 #no need for tolerance as X-Y guaranteed to overlap
+angles=[0,90]
 
 #X-U-V 
-tolerance=0.7 #~pitch/sqrt(2)
-angles=[0,60,120]
+#tolerance=0.7 #~pitch/sqrt(2)
+#angles=[0,60,120]
 
 #X-U-V-Y
 #tolerance=2.5 #needed for 4 planes, why?
@@ -134,8 +134,8 @@ for nMeanProton in range(10,11):
 
 mycanvas = TCanvas( "c1", "Ambiguities", 550,195,800,700 )
 ambiguityRate.Draw("COLZText")
-mycanvas.SaveAs("outputAmbiguities_"+(str)(size)+"cm.C")
-mycanvas.SaveAs("outputAmbiguities_"+(str)(size)+"cm.png")
+mycanvas.SaveAs("OutputData/outputAmbiguities_"+(str)(size)+"cm.C")
+mycanvas.SaveAs("OutputData/outputAmbiguities_"+(str)(size)+"cm.png")
 ambiguityRateRefined.Draw("COLZTEXT")
-mycanvas.SaveAs("outputAmbiguitiesRefined_"+(str)(size)+"cm.C")
-mycanvas.SaveAs("outputAmbiguitiesRefined_"+(str)(size)+"cm.png")
+mycanvas.SaveAs("OutputData/outputAmbiguitiesRefined_"+(str)(size)+"cm.C")
+mycanvas.SaveAs("OutputData/outputAmbiguitiesRefined_"+(str)(size)+"cm.png")

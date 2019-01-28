@@ -50,12 +50,14 @@ def GetStripCoOrds(XY,pitch,angles):
         Strips=[StripX,StripU,StripHalfX,StripHalfU]
 
         if len(angles)>2:
+               # print("3 plane tracker")
                 for coord in XY:
                         StripV.append(ConvertXYToStrip(coord,pitch,angles[2]))
                         StripHalfV.append(CheckStripHalf(coord,pitch,angles[2]))
                 Strips=[StripX,StripU,StripV,StripHalfX,StripHalfU,StripHalfV]
                         
         if len(angles)>3:
+               # print("4 plane tracker")
                 for coord in XY:
                         StripY.append(ConvertXYToStrip(coord,pitch,angles[3]))
                         StripHalfY.append(CheckStripHalf(coord,pitch,angles[3]))
@@ -212,9 +214,11 @@ def FindOverlaps2Planes(Strips,pitch,angles,tolerance,useHalfStrips):
 	for X,xHalf in zip(Strips[0],Strips[2]):
 		for U,uHalf in zip(Strips[1],Strips[3]):
 
-                        xmean=X*pitch
-                        ymean=U*pitch
 
+			xycoords=FindUVIntersect(X,U,angles[0],angles[1],pitch)
+                        xmean=xycoords[0]
+                        ymean=xycoords[1]
+                        
                         if useHalfStrips and CheckHalves([xmean,ymean],pitch,[xHalf,uHalf],angles)==False:
                                 continue
                         
@@ -248,12 +252,11 @@ def FindOverlaps3Planes(Strips,pitch,angles,tolerance,useHalfStrips):
 def FindOverlaps4Planes(Strips,pitch,angles,tolerance,useHalfStrips):
 
         allHits=[]
-        
 	#find the Y coordinate where the X and U or V intercept and see if they are close
-	for X,xHalf in Strips[0],Strips[4]:
-		for U,uHalf in Strips[1],Strips[5]:
-			for V,vHalf in Strips[2],Strips[6]:
-			        for Y,yHalf in Strips[3],Strips[7]:
+	for X,xHalf in zip(Strips[0],Strips[4]):
+		for U,uHalf in zip(Strips[1],Strips[5]):
+			for V,vHalf in zip(Strips[2],Strips[6]):
+			        for Y,yHalf in zip(Strips[3],Strips[7]):
                                         xycoords=[]
 
                                         xycoords.append(FindUVIntersect(X,U,angles[0],angles[1],pitch))
@@ -494,3 +497,37 @@ def RemoveAmbiguities(inHits,rawAngle,pitch):
                        XUVAcceptedHits.append(hitA)  
 
         return XUVAcceptedHits
+
+def FindRadialSeparation(i,j):
+
+        return math.sqrt((i[0]-j[0])**2 + (i[1]-j[1])**2)
+
+def ReconstructTracks(Hits,tolerance,pitch):
+
+        RecoTracks=[]
+        
+        while len(Hits[0])>0 and len(Hits[1])>0:
+                #print("Lenghts=",len(Hits[0]),len(Hits[1]))
+                minimumSeparation=100000
+                bestIPos=-1
+                bestJPos=-1
+                for i in range(len(Hits[0])):
+                        for j in range(len(Hits[1])):
+                                hitI=Hits[0][i]
+                                hitJ=Hits[1][j]
+                                r=FindRadialSeparation(hitI,hitJ)
+                                if r<minimumSeparation:
+                                        bestIPos=i
+                                        bestJPos=j
+                                        minimumSeparation=r
+               # print minimumSeparation
+                if minimumSeparation<tolerance*pitch:
+                        #Append hit positions to track list
+                        RecoTracks.append([Hits[0][bestIPos],Hits[1][bestJPos]])
+                        #delete entries from Hits
+                        del Hits[0][bestIPos]
+                        del Hits[1][bestJPos]
+                else:
+                        break
+
+        return RecoTracks
