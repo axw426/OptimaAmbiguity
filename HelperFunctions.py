@@ -1,7 +1,7 @@
 import random
 import math
-from ROOT import gROOT, TCanvas, TF1, TF2, TH2F, TFile, TLine, TH1F
-
+from ROOT import gROOT, TCanvas, TF1, TF2, TH2F, TFile, TLine, TH1F, TLegend,TGraph
+from array import array
 
 def SetSeed(seed):
 	random.seed(seed)
@@ -17,6 +17,18 @@ def GetRandomXY(nProtons,size):
 	        #print X,Y
 	return XY
 
+def GetDirections(nProtons,beamSpread,cheat):
+        mXmY=[]
+        # m = tan(theta)
+        for x in range(nProtons):
+                mX=math.tan(random.uniform(-beamSpread/1000.0,beamSpread/1000.0))
+                mY=math.tan(random.uniform(-beamSpread/1000.0,beamSpread/1000.0))
+                if cheat==False:
+                        mXmY.append([mX,mY])
+                else:
+                        mXmY.append([0,0])
+        return mXmY
+
 def ConvertXYToStrip(coord,pitch,rawAngle):
 
         return (int)(((coord[0]-50)*math.cos(math.radians(rawAngle)) - (coord[1]-50)*math.sin(math.radians(rawAngle))) /pitch)
@@ -26,11 +38,47 @@ def CheckStripHalf(coord,pitch,rawAngle):
         y= (int)(((coord[0]-50)*math.sin(math.radians(rawAngle)) + (coord[1]-50)*math.cos(math.radians(rawAngle))) /pitch)
 
         return y
-        #if y>=0:
-        #        return 1.0
-        #else:
-        #        return -1.0
-#convert points into a strip number for each layer assuming pitch of 100um
+
+def GetTrackerStripCoOrds(XY,mXmY,pitch,angles,Z):
+	StripX=[]
+	StripU=[]
+	StripV=[]
+	StripY=[]
+        StripHalfX=[]
+        StripHalfU=[]
+        StripHalfV=[]
+        StripHalfY=[]
+        
+        for coord,direction in zip(XY,mXmY):
+                #updated pos=X0+mX*Z
+                #print(angles[0],angles[1])
+                coordX=[coord[0]+direction[0]*Z[0],coord[1]+direction[1]*Z[0]]
+                StripX.append(ConvertXYToStrip(coordX,pitch,angles[0]))
+                StripHalfX.append(CheckStripHalf(coordX,pitch,angles[0]))
+
+                coordU=[coord[0]+direction[0]*Z[1],coord[1]+direction[1]*Z[1]]
+		StripU.append(ConvertXYToStrip(coordU,pitch,angles[1]))
+                StripHalfU.append(CheckStripHalf(coordU,pitch,angles[1]))
+
+        Strips=[StripX,StripU,StripHalfX,StripHalfU]
+
+        if len(angles)>2:
+                for coord,direction in zip(XY,mXmY):
+                        coordV=[coord[0]+direction[0]*Z[2],coord[1]+direction[1]*Z[2]]
+                        StripV.append(ConvertXYToStrip(coordV,pitch,angles[2]))
+                        StripHalfV.append(CheckStripHalf(coordV,pitch,angles[2]))
+
+                Strips=[StripX,StripU,StripV,StripHalfX,StripHalfU,StripHalfV]
+                        
+        if len(angles)>3:
+                for coord,direction in zip(XY,mXmY):
+                        coordY=[coord[0]+direction[0]*Z[3],coord[1]+direction[1]*Z[3]]
+                        StripY.append(ConvertXYToStrip(coordY,pitch,angles[3]))
+                        StripHalfY.append(CheckStripHalf(coordY,pitch,angles[3]))
+	        Strips= [StripX,StripU,StripV,StripY,StripHalfX,StripHalfU,StripHalfV,StripHalfY]	
+
+        return Strips
+
 def GetStripCoOrds(XY,pitch,angles):
 	StripX=[]
 	StripU=[]
@@ -50,21 +98,19 @@ def GetStripCoOrds(XY,pitch,angles):
         Strips=[StripX,StripU,StripHalfX,StripHalfU]
 
         if len(angles)>2:
-               # print("3 plane tracker")
                 for coord in XY:
                         StripV.append(ConvertXYToStrip(coord,pitch,angles[2]))
                         StripHalfV.append(CheckStripHalf(coord,pitch,angles[2]))
                 Strips=[StripX,StripU,StripV,StripHalfX,StripHalfU,StripHalfV]
                         
         if len(angles)>3:
-               # print("4 plane tracker")
                 for coord in XY:
                         StripY.append(ConvertXYToStrip(coord,pitch,angles[3]))
                         StripHalfY.append(CheckStripHalf(coord,pitch,angles[3]))
 	        Strips= [StripX,StripU,StripV,StripY,StripHalfX,StripHalfU,StripHalfV,StripHalfY]	
 
         return Strips
-#convert points into a strip number for each layer assuming pitch of 100um
+
 def GetPixelCoOrds(XY,pitch):
         coords=[]
 	for coord in XY:
@@ -213,7 +259,6 @@ def FindOverlaps2Planes(Strips,pitch,angles,tolerance,useHalfStrips):
 	#find the Y coordinate where the X and U or V intercept and see if they are close
 	for X,xHalf in zip(Strips[0],Strips[2]):
 		for U,uHalf in zip(Strips[1],Strips[3]):
-
 
 			xycoords=FindUVIntersect(X,U,angles[0],angles[1],pitch)
                         xmean=xycoords[0]
@@ -369,6 +414,9 @@ def PlotHitMap(name,allHits,XY,Strips,pitch,size,loop,angles):
         #draw the strips which were hit
         nPlanes=len(angles)
 
+        #if nPlanes==2:
+
+        
         if nPlanes==3:
                 for X,U,V in zip(Strips[0],Strips[1],Strips[2]):
                         #draw line for X plane
@@ -498,11 +546,11 @@ def RemoveAmbiguities(inHits,rawAngle,pitch):
 
         return XUVAcceptedHits
 
-def FindRadialSeparation(i,j):
+def FindRadius(i,j):
 
         return math.sqrt((i[0]-j[0])**2 + (i[1]-j[1])**2)
 
-def ReconstructTracks(Hits,tolerance,pitch):
+def ReconstructTracks2Planes(Hits,tolerance,pitch):
 
         RecoTracks=[]
         
@@ -515,7 +563,7 @@ def ReconstructTracks(Hits,tolerance,pitch):
                         for j in range(len(Hits[1])):
                                 hitI=Hits[0][i]
                                 hitJ=Hits[1][j]
-                                r=FindRadialSeparation(hitI,hitJ)
+                                r=FindRadius(hitI,hitJ)
                                 if r<minimumSeparation:
                                         bestIPos=i
                                         bestJPos=j
@@ -531,3 +579,141 @@ def ReconstructTracks(Hits,tolerance,pitch):
                         break
 
         return RecoTracks
+
+def GetChi2LinearFit(hits):
+
+        n=len(hits)
+        X,Y=array('d'),array('d')
+        for i in range(n):
+                X.append(hits[i][0])
+                Y.append(hits[i][1])
+
+        graph=TGraph(4,X,Y)
+
+        graph.Fit("pol1","Q")
+
+    
+        return graph.GetFunction("pol1").GetChisquare()/(float)(graph.GetFunction("pol1").GetNDF())
+
+def SumRadialSeparation(hits):
+
+        rSum=0.0
+        xmean=0.0
+	ymean=0.0
+
+        for i in hits:
+                xmean+=i[0]
+                ymean+=i[1]
+        xmean/=len(hits)        
+        ymean/=len(hits)        
+
+        for i in hits:
+                r= math.sqrt( (i[0]-xmean)**2  + (i[1]-ymean)**2)
+                rSum+=r
+        return rSum
+
+def ReconstructTracks4Planes(Hits,trackTolerance,pitch):
+
+        nTrackerModules=len(Hits)
+        RecoTracks=[]
+        
+        while len(Hits[0])>0 and len(Hits[1])>0 and len(Hits[2])>0 and len(Hits[3])>0:
+                bestChi2=100000
+                bestIPos=-1
+                bestJPos=-1
+                bestKPos=-1
+                bestLPos=-1
+
+                #loop over all combos from each tracker module: find chi2 to linear fit
+                for i in range(len(Hits[0])):
+                        for j in range(len(Hits[1])):
+                                for k in range(len(Hits[2])):
+                                        for l in range(len(Hits[3])):
+                                                hitI=Hits[0][i]
+                                                hitJ=Hits[1][j]
+                                                hitK=Hits[2][k]
+                                                hitL=Hits[3][l]
+                                                #chi2=GetChi2LinearFit([hitI,hitJ,hitK,hitL])
+                                                chi2=SumRadialSeparation([hitI,hitJ,hitK,hitL])
+                                                if chi2<bestChi2 and chi2>0.0001:
+                                                        bestIPos=i
+                                                        bestJPos=j
+                                                        bestKPos=k
+                                                        bestLPos=l
+                                                        bestChi2=chi2
+
+                #print("bestChi2=",bestChi2,[Hits[0][bestIPos],Hits[1][bestJPos],Hits[2][bestKPos],Hits[3][bestLPos]])
+                if bestChi2<trackTolerance : #NEED TO DECIDE SENSIBLE VALUE
+                        #Append hit positions to track list
+                        RecoTracks.append([Hits[0][bestIPos],Hits[1][bestJPos],Hits[2][bestKPos],Hits[3][bestLPos]])
+                        #delete entries from Hits
+                        del Hits[0][bestIPos]
+                        del Hits[1][bestJPos]
+                        del Hits[2][bestKPos]
+                        del Hits[3][bestLPos]
+                else:
+                       # print("Best Chi2=",bestChi2)
+                        break
+
+        return RecoTracks
+
+def ReconstructTracks(Hits,trackTolerance,pitch):
+
+        if len(Hits)==2:
+                return ReconstructTracks2Planes(Hits,trackTolerance,pitch)   
+        elif len(Hits)==4:
+                return ReconstructTracks4Planes(Hits,trackTolerance,pitch)
+        else:
+                print("Can only cope with 2 or 4 tracker modules!")
+              
+def DrawTrackMap(name,Tracks,XY,xmax):
+
+        truth=TH2F("Truth","Hit Locations",1000,-xmax,xmax,1000,-xmax,xmax)
+        truth.SetMarkerColor(1)
+        truth.SetMarkerSize(2)
+        truth.SetMarkerStyle(4)
+        tracker1=TH2F("Tracker1","Hit Locations",1000,-xmax,xmax,1000,-xmax,xmax)
+        tracker1.SetMarkerColor(2)
+        tracker1.SetMarkerSize(2)
+        tracker1.SetMarkerStyle(2)
+        tracker2=TH2F("Tracker2","Hit Locations",1000,-xmax,xmax,1000,-xmax,xmax)
+        tracker2.SetMarkerColor(4)
+        tracker2.SetMarkerSize(2)
+        tracker2.SetMarkerStyle(5)
+        tracker3=TH2F("Tracker3","Hit Locations",1000,-xmax,xmax,1000,-xmax,xmax)
+        tracker3.SetMarkerColor(4)
+        tracker3.SetMarkerSize(2)
+        tracker3.SetMarkerStyle(32)
+        tracker4=TH2F("Tracker4","Hit Locations",1000,-xmax,xmax,1000,-xmax,xmax)
+        tracker4.SetMarkerColor(4)
+        tracker4.SetMarkerSize(2)
+        tracker4.SetMarkerStyle(26)
+
+        trackerArray=[]
+        trackerArray.append(tracker1)
+        trackerArray.append(tracker2)
+        trackerArray.append(tracker3)
+        trackerArray.append(tracker4)
+        
+        for coord in XY:
+                truth.Fill(coord[0],coord[1])
+        
+        for track in Tracks:
+                for i in range(len(track)):
+                        trackerArray[i].Fill(track[i][0],track[i][1])
+
+        canvas1 = TCanvas( 'c1', "mycanvas", 200, 10, 700, 500 )
+        trackerArray[0].Draw()
+        trackerArray[1].Draw("SAME")
+        trackerArray[2].Draw("SAME")
+        trackerArray[3].Draw("SAME")
+        truth.Draw("SAME")
+
+        legend=TLegend(0.1,0.7,0.48,0.9)
+        legend.AddEntry(truth,"Truth","p")
+        legend.AddEntry(trackerArray[0],"Tracker1","p")
+        legend.AddEntry(trackerArray[1],"Tracker2","p")
+        legend.AddEntry(trackerArray[2],"Tracker3","p")
+        legend.AddEntry(trackerArray[3],"Tracker4","p")
+        legend.Draw("SAME")
+        canvas1.Write(name)
