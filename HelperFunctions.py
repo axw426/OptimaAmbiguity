@@ -11,8 +11,8 @@ def GetRandomXY(nProtons,size):
 	for x in range(nProtons):
 		X=random.uniform(-size*5000.0,size*5000.0) #10000 um per cm
 		Y=random.uniform(-size*5000.0,size*5000.0) #10000 um per cm
-	#	X=random.gauss(0.0,6000)
-	#	Y=random.gauss(0.0,6000)
+		#X=random.gauss(0.0,6000)
+		#Y=random.gauss(0.0,6000)
                 XY.append([X,Y])
 	        #print X,Y
 	return XY
@@ -31,11 +31,28 @@ def GetDirections(nProtons,beamSpread,cheat):
 
 def ConvertXYToStrip(coord,pitch,rawAngle):
 
-        return (int)(((coord[0]-50)*math.cos(math.radians(rawAngle)) - (coord[1]-50)*math.sin(math.radians(rawAngle))) /pitch)
+        #rotate xy by appropriate angle, divide by pitch to get strip number, means strip zero is centred on x=pitch/2.0
+        #return (int)(( coord[0]*math.cos(math.radians(rawAngle)) - coord[1]*math.sin(math.radians(rawAngle))) /pitch)
 
+        #OR rotate by angle, + pitch/2.0 , divide by pitch: strip zero now centred on 0.0 
+        #return (int)(((coord[0]-(pitch/2.0))*math.cos(math.radians(rawAngle)) - (coord[1]-(pitch/2.0))*math.sin(math.radians(rawAngle))) /pitch)
+        # return (int)(((coord[0])*math.cos(math.radians(rawAngle)) - (coord[1])*math.sin(math.radians(rawAngle))+pitch/2.0) /pitch)
+
+        rotatedX= coord[0]*math.cos(math.radians(rawAngle)) - coord[1]*math.sin(math.radians(rawAngle))
+        if rotatedX >=0.5:
+                Strip=int((rotatedX+pitch/2.0)/pitch)
+        elif rotatedX <=-0.5:
+                Strip=int((rotatedX-pitch/2.0)/pitch)
+        else:
+                Strip=0
+
+       # print coord, rawAngle, Strip
+        return Strip
 def CheckStripHalf(coord,pitch,rawAngle):
 
-        y= (int)(((coord[0]-50)*math.sin(math.radians(rawAngle)) + (coord[1]-50)*math.cos(math.radians(rawAngle))) /pitch)
+        #assuming centre of sensor is at y=0.0,x=0.0
+        #y= (int)(((coord[0]-(pitch/2.0))*math.sin(math.radians(rawAngle)) + (coord[1]-(pitch/2.0))*math.cos(math.radians(rawAngle)))/pitch)
+        y= (int)((coord[0]*math.sin(math.radians(rawAngle)) + coord[1]*math.cos(math.radians(rawAngle))) /pitch)
 
         return y
 
@@ -135,7 +152,7 @@ def FindIntersect(X,U,theta,pitch):
 	#U line described by y=mx+c, where: m=-tan(90-Theta),c= X'/cos(90-theta)
 
 	x=(X*pitch)#+pitch/2.0
-	m,c=FindMandC(U,theta,pitch)
+	m,c=FindMandC(U,-theta,pitch)
 	y=(m*x)+c
 
         #print("M=",m,"c=",c,"x=",x,"X'=",xPrime,"y=",y)
@@ -145,25 +162,29 @@ def FindIntersect(X,U,theta,pitch):
 def FindUVIntersect(U,V,uAngle,vAngle,pitch):
 
         if uAngle==0:
-                return FindIntersect(U,V,-vAngle,pitch)
+                return FindIntersect(U,V,vAngle,pitch)
 
         if vAngle==0:
-                return FindIntersect(V,U,-uAngle,pitch)
+                return FindIntersect(V,U,uAngle,pitch)
 
         #define y=mx+c for U and V in frame of X layer
 
         m1,c1=FindMandC(U,-uAngle,pitch)
-	
+	#print(m1,c1)
         m2,c2=FindMandC(V,-vAngle,pitch)
-	
+	#print(m2,c2)
+
 	Xintercept=(c2-c1)/(m1-m2)
 	Yintercept1=(m1*Xintercept) + c1
 	Yintercept2=(m2*Xintercept) + c2
-	
+	#print("XIntercept=",Xintercept,"YIntercept1=",Yintercept1,"YIntercept2=",Yintercept2)
 	return [Xintercept,Yintercept1]
 	
 
 def CheckProximity(xycoords,tolerance,pitch):	
+
+        #print("XYCOORDS=",xycoords)
+        #print("Side length=",math.sqrt( (xycoords[0][1]-xycoords[1][1])**2  + (xycoords[0][0]-xycoords[1][0])**2))
 
         passed=True
 
@@ -181,6 +202,7 @@ def CheckProximity(xycoords,tolerance,pitch):
                 r= math.sqrt( (xycoords[i][1]-ymean)**2  + (xycoords[i][0]-xmean)**2)
                 rValues.append(r)
                 if r>=tolerance*pitch:
+                        #print("r=",r)
                         passed=False
 
         return passed,xmean,ymean,rValues
@@ -286,7 +308,7 @@ def FindOverlaps3Planes(Strips,pitch,angles,tolerance,useHalfStrips):
 				xycoords.append(FindUVIntersect(U,V,angles[1],angles[2],pitch))
 
 				passed,xmean,ymean,rValues=CheckProximity(xycoords,tolerance,pitch)
-
+                                
                                 if passed==True:
                                         if useHalfStrips and CheckHalves([xmean,ymean],pitch,[xHalf,uHalf,vHalf],angles)==False:
                                                 continue
@@ -400,7 +422,7 @@ def PlotHitMap(name,allHits,XY,Strips,pitch,size,loop,angles):
         xmax=size*5000
 
         #draw reconstructed points
-        rawmeasured=TH2F(name+(str)(loop),"Hit Locations",1000,-xmax,xmax,1000,-xmax,xmax)
+        rawmeasured=TH2F(name+(str)(loop),"Hit Locations",3000,-xmax,xmax,3000,-xmax,xmax)
         rawmeasured.GetXaxis().SetTitle("X position (#mum)")
         rawmeasured.GetYaxis().SetTitle("Y position (#mum)")
         rawmeasured.SetMarkerColor(4)
@@ -428,6 +450,20 @@ def PlotHitMap(name,allHits,XY,Strips,pitch,size,loop,angles):
                         linearray.append(CreateTLines(xmax,U,angles[1],pitch))
                         linearray.append(CreateTLines(xmax,V,angles[2],pitch))
 
+                        if len(allHits)==1:
+                                linearray.append(TLine((X-1)*pitch,-xmax,(X-1)*pitch,xmax))
+                                linearray[-1].SetLineColor(3)
+                                linearray.append(TLine((X+1)*pitch,-xmax,(X+1)*pitch,xmax))
+                                linearray[-1].SetLineColor(3)
+                                linearray.append(CreateTLines(xmax,U-1,angles[1],pitch))
+                                linearray[-1].SetLineColor(3)
+                                linearray.append(CreateTLines(xmax,V-1,angles[2],pitch))
+                                linearray[-1].SetLineColor(3)
+                                linearray.append(CreateTLines(xmax,U+1,angles[1],pitch))
+                                linearray[-1].SetLineColor(3)
+                                linearray.append(CreateTLines(xmax,V+1,angles[2],pitch))
+                                linearray[-1].SetLineColor(3)
+
         if nPlanes==4:
                 for X,U,V,Y in zip(Strips[0],Strips[1],Strips[2],Strips[3]):
                         #draw line for X plane
@@ -445,7 +481,7 @@ def PlotHitMap(name,allHits,XY,Strips,pitch,size,loop,angles):
                                
 
         #draw where protons really hit
-        truth=TH2F("truth"+(str)(loop),"Hit Locations",1000,-xmax,xmax,1000,-xmax,xmax)
+        truth=TH2F("truth"+(str)(loop),"Hit Locations",3000,-xmax,xmax,3000,-xmax,xmax)
         truth.SetMarkerSize(2)
         truth.SetMarkerStyle(23)
         truth.SetMarkerColor(2)
@@ -496,6 +532,8 @@ def GetEfficiency(allHits,XY,pitch,tolerance):
 
 def GetPixelArea(hit,angles,pitch):
 
+        #for perfect overlap in 3 planes --> area =pitch*pitch/tan(60)
+        
         #find crossing points for XU,XV,and UV and assume triangular
         rSum=0.0
 
@@ -504,11 +542,9 @@ def GetPixelArea(hit,angles,pitch):
 	XV=FindUVIntersect(Strips[0],Strips[2],angles[0],angles[2],pitch)
 	UV=FindUVIntersect(Strips[1],Strips[2],angles[1],angles[2],pitch)
 
-        base=XU[1]-XV[1]
-        height=XU[0]-UV[0]
+        area=abs(XU[0]*(XV[1]-UV[1]) + XV[0]*(UV[1]-XU[1]) +UV[0]*(XU[1]-XV[1]))/2.0
 
-        #print(XU[1]-XV[1])
-        return 0.5*base*height
+        return area
         
 
 def RemoveAmbiguities(inHits,rawAngle,pitch):
@@ -717,3 +753,29 @@ def DrawTrackMap(name,Tracks,XY,xmax):
         legend.AddEntry(trackerArray[3],"Tracker4","p")
         legend.Draw("SAME")
         canvas1.Write(name)
+
+
+def GetTrackSeparation(trueTrack,recoTrack):
+
+        separation=0.0
+        
+        for trueHit,recoHit in zip(trueTrack,recoTrack):
+                separation +=math.sqrt((trueHit[0]-recoHit[0])**2 + (trueHit[1]-recoHit[1])**2)
+        #print separation
+        return separation
+        
+def GetTrackEfficiency(effTolerance,XY,mXmY,RecoTracks,TrackerPositions):
+
+        nTrueFound=0.0
+        
+        for coord,direction in zip(XY,mXmY):
+                trueTrack=[]
+                for Z in TrackerPositions:
+                        trueTrack.append([coord[0]+direction[0]*Z,coord[1]+direction[1]*Z])
+                #loop over tracks and see if one matches at each point within tolerance
+                for recoTrack in RecoTracks:
+                        if GetTrackSeparation(trueTrack,recoTrack)<effTolerance:
+                                nTrueFound+=1.0
+                                break
+
+        return nTrueFound/(float)(len(XY))

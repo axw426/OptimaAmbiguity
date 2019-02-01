@@ -8,19 +8,19 @@ import time
 
 hf.SetSeed(2022)
 saveStripMaps=True
-useHalfStrips=False
+useHalfStrips=True
 
 NLoops=10
 size=10 #cm
 
 
 #X-Y
-tolerance=0.0 #no need for tolerance as X-Y guaranteed to overlap
-angles=[0,90]
+#tolerance=0.0 #no need for tolerance as X-Y guaranteed to overlap
+#angles=[0,90]
 
 #X-U-V 
-#tolerance=0.7 #~pitch/sqrt(2)
-#angles=[0,60,120]
+tolerance=0.7 #~pitch/sqrt(2)
+angles=[0,60,120]
 
 #X-U-V-Y
 #tolerance=2.5 #needed for 4 planes, why?
@@ -66,11 +66,11 @@ for nMeanProton in range(10,11):
                 myHitMap=TH2F("myHitMap","Hit Locations",(int)(2*xmax/pitch),-xmax,xmax,(int)(2*xmax/pitch),-xmax,xmax)
 
                 for i in range(NLoops):
-                        if i%100 == 0:
+                        if i%1 == 0:
                                 print("Processing loop "+(str)(i))
 
-                        #nProton=nMeanProton
-                        nProton=np.random.poisson(nMeanProton)
+                        nProton=nMeanProton
+                        #nProton=np.random.poisson(nMeanProton)
                         hNProtons.Fill(nProton)
                         totalProtons+=nProton
                         if nProton==0:
@@ -100,8 +100,11 @@ for nMeanProton in range(10,11):
                                 hf.PlotHitMap("RawHits",allHits,XY,Strips,pitch,size,i,angles)
 
 
-
-
+                        #for hit in allHits:
+                        #        area=hf.GetPixelArea(hit,angles,pitch)
+                        #        if area>1.0:
+                        #                print "Area=",area,hit
+                                
 
                         #remove duplicate hits (separated by < tolerance) 
                         refinedHits=hf.RemoveAdjacentHits(allHits,tolerance,pitch)
@@ -114,7 +117,9 @@ for nMeanProton in range(10,11):
 
                         if saveStripMaps:
                                 hf.PlotHitMap("RefinedHits",refinedHits,XY,Strips,pitch,size,i,angles)
-
+                        if len(refinedHits)<len(allHits):
+                                print("Found a duplicate")
+                                print allHits
 
                 rawAmbiguity=100*(nRawHits-totalProtons)/totalProtons
                 refinedAmbiguity=100*(nRefinedHits-totalProtons)/totalProtons
