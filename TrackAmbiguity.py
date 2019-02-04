@@ -13,7 +13,8 @@ pitch=100.0
 size=10 #cm
 xmax=size*5000
 
-stripTolerance=0.7
+stripTolerance=0.7 #3 planes per module
+stripTolerance=1.5 #4 planes per module...for some reason
 effTolerance=2500
 
 

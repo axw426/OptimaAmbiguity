@@ -6,13 +6,13 @@ from array import array
 def SetSeed(seed):
 	random.seed(seed)
 
-def GetRandomXY(nProtons,size):
+def GetRandomXY(nProtons,size,width=6,posX=0,posY=0):
 	XY=[]
 	for x in range(nProtons):
-		X=random.uniform(-size*5000.0,size*5000.0) #10000 um per cm
-		Y=random.uniform(-size*5000.0,size*5000.0) #10000 um per cm
-		#X=random.gauss(0.0,6000)
-		#Y=random.gauss(0.0,6000)
+		#X=random.uniform(-size*5000.0,size*5000.0) #10000 um per cm
+		#Y=random.uniform(-size*5000.0,size*5000.0) #10000 um per cm
+		X=random.gauss(posX*10000.0,width*1000.0)
+		Y=random.gauss(posY*10000.0,width*1000.0)
                 XY.append([X,Y])
 	        #print X,Y
 	return XY
@@ -779,3 +779,65 @@ def GetTrackEfficiency(effTolerance,XY,mXmY,RecoTracks,TrackerPositions):
                                 break
 
         return nTrueFound/(float)(len(XY))
+
+def ReadJohnFile(inFile):
+        lastTimestamp=-1
+
+        stripshift=512
+
+
+        with open(inFile,'r') as f:
+                #line=f.readline()#first line is empty...
+                #line=f.readline()#second line isn't real data...
+                #line=f.readline()#third line isn't real data...
+                line=f.readline()
+                while line:
+                        values=line.split()
+                        timestamp=values[0]
+                        #check if any hits in entry, check if there are same number of hits in each of the trackers- needed for reconstruction
+                        if tracker1Hits and len(tracker1Hits)==len(tracker2Hits) and len(tracker1Hits)==len(tracker3Hits) and len(tracker1Hits)==len(tracker4Hits):
+
+                                hitsByTimestamp.append([tracker1Hits,tracker2Hits,tracker3Hits,tracker4Hits])
+
+                                lastTimestamp=timestamp
+                                tracker1Hits=[[],[],[]]
+                                tracker2Hits=[[],[],[]]
+                                tracker3Hits=[[],[],[]]
+                                tracker4Hits=[[],[],[]]
+
+                                
+                        #loop over 4 data entries and only add them if there's a hit in all planes- format of data is V,X,U (i.e. middle value is the 0 degrees plane)
+                        for i in range (1,5):
+                                j=i+4
+                                k=i+8
+                                l=i+12
+                                #check value is valid
+                                if ( values[i]!='-1' and values[i+4]!='-1' and values[i+8]!='-1'):
+                                       tracker1Hits[2].append((int)(values[i])-stripshift)
+                                       tracker1Hits[0].append((int)(values[i+4])-stripshift)
+                                       tracker1Hits[1].append((int)(values[i+8])-stripshift)
+
+                                #check value is valid
+                                if ( values[j]!='-1' and values[j+4]!='-1' and values[j+8]!='-1'):
+                                       tracker2Hits[2].append((int)(values[j])-stripshift)
+                                       tracker2Hits[0].append((int)(values[j+4])-stripshift)
+                                       tracker2Hits[1].append((int)(values[j+8])-stripshift)
+
+                                #check value is valid
+                                if ( values[k]!='-1' and values[k+4]!='-1' and values[k+8]!='-1'):
+                                       tracker3Hits[2].append((int)(values[k])-stripshift)
+                                       tracker3Hits[0].append((int)(values[k+4])-stripshift)
+                                       tracker3Hits[1].append((int)(values[k+8])-stripshift)
+
+                                #check value is valid
+                                if ( values[l]!='-1' and values[l+4]!='-1' and values[l+8]!='-1'):
+                                       tracker4Hits[2].append((int)(values[l])-stripshift)
+                                       tracker4Hits[0].append((int)(values[l+4])-stripshift)
+                                       tracker4Hits[1].append((int)(values[l+8])-stripshift)
+
+                        line=f.readline()
+
+        hXStrips.Write()
+        hUStrips.Write()
+        hVStrips.Write()
+        return hitsByTimestamp
