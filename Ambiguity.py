@@ -32,7 +32,7 @@ angles=[0,60,120]
 #tolerance=1.5 #needed for 4 planes, why?
 #angles=[0,45,90,135]
 
-effTolerance=2.5
+effTolerance=1.0
 
 
 xmax=size*5000
@@ -115,7 +115,8 @@ for nMeanProton in range(10,11):
                                 
 
                         #remove duplicate hits (separated by < tolerance) 
-                        refinedHits=hf.RemoveAdjacentHits(allHits,tolerance,pitch)
+                        #refinedHits=hf.RemoveAdjacentHits(allHits,tolerance,pitch)
+                        refinedHits=hf.MergeAdjacentHits(allHits,effTolerance,pitch)
 
 
                         nRefinedHits+=len(refinedHits)

@@ -59,7 +59,7 @@ for nMeanProton in range(10,11):
                         #returns hit objects of form (XCoord,YCoord,[stripX,stripU,stripV],[radial distance to intersections])
                         Strips=hf.GetTrackerStripCoOrds(XY,mXmY,pitch,TrackerAngles[module],TrackerZ[module])
                         Hits=hf.FindOverlaps(Strips,pitch,TrackerAngles[module],stripTolerance,useHalfStrips)
-                        #Hits=hf.RemoveAdjacentHits(Hits,stripTolerance,pitch)
+                        #Hits=hf.RemoveAdjacentHits(Hits,effTolerance,pitch)
                         TrackerHits.append(Hits)
                         nTrackerHits[module]+=len(Hits)
 

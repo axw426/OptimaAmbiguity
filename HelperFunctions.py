@@ -2,6 +2,7 @@ import random
 import math
 from ROOT import gROOT, TCanvas, TF1, TF2, TH2F, TFile, TLine, TH1F, TLegend,TGraph
 from array import array
+import copy
 
 def SetSeed(seed):
 	random.seed(seed)
@@ -511,7 +512,9 @@ def PlotHitMap(name,allHits,XY,Strips,pitch,size,loop,angles):
 def GetSeparation(hit1,hit2):
 
         return math.sqrt((hit1[0]-hit2[0])**2 + (hit1[1]-hit2[1])**2)
-        
+
+    
+
 def RemoveAdjacentHits(allHits,tolerance,pitch):
 
         #thou must not edit python lists while iterating over them...
@@ -523,10 +526,60 @@ def RemoveAdjacentHits(allHits,tolerance,pitch):
                 for j in refinedHits:
                         if GetSeparation(i,j)<=tolerance*pitch:
                                 passed=False
-                                
+                                break
+                               
                 if passed==True:
                         refinedHits.append(i)
 
+        #for i in allHits:
+        #        print i
+        #print ""
+        #for i in refinedHits:
+        #        print i
+        return refinedHits
+
+
+def SumHits(hits):
+
+        #only bothering to correct x-y position, not sure it makes as much sense for other hit parameters
+        xmean=0.0
+        ymean=0.0
+
+        for hit in hits:
+                xmean+=hit[0]
+                ymean+=hit[1]
+        xmean/=(float)(len(hits))
+        ymean/=(float)(len(hits))
+
+        newHit=hits[0]
+        newHit[0]=xmean
+        newHit[1]=ymean
+        newHit.append("modified")
+
+        return newHit
+
+def MergeAdjacentHits(allHits,tolerance,pitch):
+
+        #thou must not edit python lists while iterating over them...
+        refinedHits=[]
+        remainingHits=copy.deepcopy(allHits)
+
+        while True:
+                if len(remainingHits)==0:
+                        break
+
+                i=remainingHits[0]
+                toBeSummed=[i]
+                remainingHits.remove(i)
+
+                currentHits=copy.deepcopy(remainingHits)
+                for j in currentHits:
+                        if GetSeparation(i,j)<=tolerance*pitch:
+                                toBeSummed.append(j)
+                                remainingHits.remove(j)
+                refinedHits.append(SumHits(toBeSummed))
+                                
+                        
         return refinedHits
 
 def GetEfficiency(allHits,XY,pitch,tolerance):
