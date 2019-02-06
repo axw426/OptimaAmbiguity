@@ -245,12 +245,18 @@ def RestrictLine(l, xmin, ymin, xmax, ymax,m,c):
 
 def CreateTLines(xmax,U,uAngle,pitch):
 
-	m1,c1=FindMandC(U,-uAngle,pitch)
-	myline= TLine(-xmax,m1*(-xmax)+c1,xmax,m1*(xmax)+c1 )
-        myline.SetLineColor(1)
-        myline.SetLineWidth(1)
+        if uAngle==0:
+                myline=TLine(U*pitch,-xmax,U*pitch,xmax)
+                myline.SetLineColor(1)
+                myline.SetLineWidth(1)
+                return myline
+        else:
+	        m1,c1=FindMandC(U,-uAngle,pitch)
+	        myline= TLine(-xmax,m1*(-xmax)+c1,xmax,m1*(xmax)+c1 )
+                myline.SetLineColor(1)
+                myline.SetLineWidth(1)
 
-        return RestrictLine(myline, -xmax, -xmax, xmax, xmax,m1,c1)
+                return RestrictLine(myline, -xmax, -xmax, xmax, xmax,m1,c1)
         
 
 def checkForDuplicates(xmean,ymean,allHits,tolerance):
@@ -441,23 +447,20 @@ def PlotHitMap(name,allHits,XY,Strips,pitch,size,loop,angles):
         
         if nPlanes==3:
                 for X,U,V in zip(Strips[0],Strips[1],Strips[2]):
-                        #draw line for X plane
-                        x=(X*pitch)#+pitch/2.0
-                        myline=TLine(x,-xmax,x,xmax)
-                        myline.SetLineColor(1)
-                        myline.SetLineWidth(1)
-                        linearray.append(myline)
+
+                        linearray.append(CreateTLines(xmax,X,angles[0],pitch))
                         linearray.append(CreateTLines(xmax,U,angles[1],pitch))
                         linearray.append(CreateTLines(xmax,V,angles[2],pitch))
 
                         if len(allHits)==1:
-                                linearray.append(TLine((X-1)*pitch,-xmax,(X-1)*pitch,xmax))
-                                linearray[-1].SetLineColor(3)
-                                linearray.append(TLine((X+1)*pitch,-xmax,(X+1)*pitch,xmax))
+
+                                linearray.append(CreateTLines(xmax,X-1,angles[0],pitch))
                                 linearray[-1].SetLineColor(3)
                                 linearray.append(CreateTLines(xmax,U-1,angles[1],pitch))
                                 linearray[-1].SetLineColor(3)
                                 linearray.append(CreateTLines(xmax,V-1,angles[2],pitch))
+                                linearray[-1].SetLineColor(3)
+                                linearray.append(CreateTLines(xmax,X+1,angles[0],pitch))
                                 linearray[-1].SetLineColor(3)
                                 linearray.append(CreateTLines(xmax,U+1,angles[1],pitch))
                                 linearray[-1].SetLineColor(3)
@@ -466,26 +469,22 @@ def PlotHitMap(name,allHits,XY,Strips,pitch,size,loop,angles):
 
         if nPlanes==4:
                 for X,U,V,Y in zip(Strips[0],Strips[1],Strips[2],Strips[3]):
-                        #draw line for X plane
-                        x=(X*pitch)#+pitch/2.0
-                        myline=TLine(x,-xmax,x,xmax)
-                        myline.SetLineColor(1)
-                        myline.SetLineWidth(1)
-                        linearray.append(myline)
+
+                        linearray.append(CreateTLines(xmax,X,angles[0],pitch))
                         linearray.append(CreateTLines(xmax,U,angles[1],pitch))
                         linearray.append(CreateTLines(xmax,V,angles[2],pitch))
                         linearray.append(CreateTLines(xmax,Y,angles[3],pitch))
 
                         if len(allHits)==1:
-                                linearray.append(TLine((X-1)*pitch,-xmax,(X-1)*pitch,xmax))
-                                linearray[-1].SetLineColor(3)
-                                linearray.append(TLine((X+1)*pitch,-xmax,(X+1)*pitch,xmax))
+                                linearray.append(CreateTLines(xmax,X-1,angles[0],pitch))
                                 linearray[-1].SetLineColor(3)
                                 linearray.append(CreateTLines(xmax,U-1,angles[1],pitch))
                                 linearray[-1].SetLineColor(3)
                                 linearray.append(CreateTLines(xmax,V-1,angles[2],pitch))
                                 linearray[-1].SetLineColor(3)
                                 linearray.append(CreateTLines(xmax,Y-1,angles[3],pitch))
+                                linearray[-1].SetLineColor(3)
+                                linearray.append(CreateTLines(xmax,X+1,angles[0],pitch))
                                 linearray[-1].SetLineColor(3)
                                 linearray.append(CreateTLines(xmax,U+1,angles[1],pitch))
                                 linearray[-1].SetLineColor(3)
@@ -540,6 +539,7 @@ def GetEfficiency(allHits,XY,pitch,tolerance):
                 passed=False
                 for reco in allHits:
                         if math.sqrt((true[0]-reco[0])**2 + (true[1]-reco[1])**2)<pitch*tolerance:
+                                #print math.sqrt((true[0]-reco[0])**2 + (true[1]-reco[1])**2)
                                 passed=True
                                 break
                 if passed ==True:
@@ -781,6 +781,8 @@ def DrawTrackMap(name,Tracks,XY,xmax):
         legend.Draw("SAME")
         canvas1.Write(name)
 
+        
+
 
 def GetTrackSeparation(trueTrack,recoTrack):
 
@@ -791,13 +793,21 @@ def GetTrackSeparation(trueTrack,recoTrack):
         #print separation
         return separation
         
-def GetTrackEfficiency(effTolerance,XY,mXmY,RecoTracks,TrackerPositions):
+def GetTrackEfficiency(effTolerance,XY,mXmY,RecoTracks,TrackerPositions,pitch):
 
+        #if only one module, tracks are just hits for one module
+        if len(TrackerPositions)==1:
+               return GetEfficiency(RecoTracks,XY,pitch,effTolerance)
+
+        
         nTrueFound=0.0
+        TrackerZ=[]
+        for positions in TrackerPositions:
+                TrackerZ+=positions
         
         for coord,direction in zip(XY,mXmY):
                 trueTrack=[]
-                for Z in TrackerPositions:
+                for Z in TrackerZ:
                         trueTrack.append([coord[0]+direction[0]*Z,coord[1]+direction[1]*Z])
                 #loop over tracks and see if one matches at each point within tolerance
                 for recoTrack in RecoTracks:

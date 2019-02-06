@@ -10,22 +10,22 @@ from array import array
 hf.SetSeed(2022)
 np.random.seed(53234)
 saveStripMaps=False
-useHalfStrips=True
+useHalfStrips=False
 
 NLoops=1000
-size=1 #cm
+size=20 #cm
 
 #beam properties
-width=6 #
-posX=2.5 #cm
-posY=2.5 #cm
+width=25 #mm
+posX=0.0 #cm
+posY=0.0 #cm
 
 #X-Y
 #tolerance=0.0 #no need for tolerance as X-Y guaranteed to overlap
 #angles=[0,90]
 
-#X-U-V 
-tolerance=0.7 #~pitch*2/3 (triangle innit)
+#X-U-V
+tolerance=0.67 #~pitch*2/3 (triangle innit), area=5774.0 for 100um
 angles=[0,60,120]
 
 #X-U-V-Y
@@ -44,10 +44,10 @@ _aMeanProton,_aAmbiguity=array('d'),array('d')
 _aMeanProtonError,_aAmbiguityError=array('d'),array('d')
 
 #setup histograms
-ambiguityRate=TH2F("ambiguityRate","Ambiguitie Rate (%) for uniform beam of size "+(str)(size)+"cmX"+(str)(size)+"cm", 5,10.0,110, 13,0.5,13.5)
+ambiguityRate=TH2F("ambiguityRate","Ambiguitie Rate (%) for uniform beam of width "+(str)(width)+"cm", 5,10.0,110, 13,0.5,13.5)
 ambiguityRate.GetXaxis().SetTitle("Strip Pitch (#mum)")
 ambiguityRate.GetYaxis().SetTitle("nProtons")
-ambiguityRateRefined=TH2F("ambiguityRateRefined","Ambiguitie Rate (%) for uniform beam of size "+(str)(size)+"cmX"+(str)(size)+"cm", 5,10.0,110, 13,0.5,13.5)
+ambiguityRateRefined=TH2F("ambiguityRateRefined","Ambiguitie Rate (%) for uniform beam of width "+(str)(width)+"cm", 5,10.0,110, 13,0.5,13.5)
 ambiguityRateRefined.GetXaxis().SetTitle("Strip Pitch (#mum)")
 ambiguityRateRefined.GetYaxis().SetTitle("nProtons")
 hNProtons=TH1F("hNProtons","",30,-0.5,29.5)
@@ -117,6 +117,7 @@ for nMeanProton in range(10,11):
                         #remove duplicate hits (separated by < tolerance) 
                         refinedHits=hf.RemoveAdjacentHits(allHits,tolerance,pitch)
 
+
                         nRefinedHits+=len(refinedHits)
                         hRefinedHits.Fill(len(refinedHits))
                         refinedEff=hf.GetEfficiency(refinedHits,XY,pitch,effTolerance)
@@ -154,11 +155,11 @@ for nMeanProton in range(10,11):
                 
 mycanvas = TCanvas( "c1", "Ambiguities", 550,195,800,700 )
 ambiguityRate.Draw("COLZText")
-mycanvas.SaveAs("OutputData/outputAmbiguities_"+(str)(size)+"cm.C")
-mycanvas.SaveAs("OutputData/outputAmbiguities_"+(str)(size)+"cm.png")
+mycanvas.SaveAs("OutputData/outputAmbiguities_"+(str)(width)+"cm.C")
+mycanvas.SaveAs("OutputData/outputAmbiguities_"+(str)(width)+"cm.png")
 ambiguityRateRefined.Draw("COLZTEXT")
-mycanvas.SaveAs("OutputData/outputAmbiguitiesRefined_"+(str)(size)+"cm.C")
-mycanvas.SaveAs("OutputData/outputAmbiguitiesRefined_"+(str)(size)+"cm.png")
+mycanvas.SaveAs("OutputData/outputAmbiguitiesRefined_"+(str)(width)+"cm.C")
+mycanvas.SaveAs("OutputData/outputAmbiguitiesRefined_"+(str)(width)+"cm.png")
 
 if len(_aAmbiguity) >1:
         graph=TGraphErrors(len(_aAmbiguity),_aMeanProton,_aAmbiguity,_aMeanProtonError,_aAmbiguityError)
