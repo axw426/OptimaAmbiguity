@@ -475,7 +475,24 @@ def PlotHitMap(name,allHits,XY,Strips,pitch,size,loop,angles):
                         linearray.append(CreateTLines(xmax,U,angles[1],pitch))
                         linearray.append(CreateTLines(xmax,V,angles[2],pitch))
                         linearray.append(CreateTLines(xmax,Y,angles[3],pitch))
-                        
+
+                        if len(allHits)==1:
+                                linearray.append(TLine((X-1)*pitch,-xmax,(X-1)*pitch,xmax))
+                                linearray[-1].SetLineColor(3)
+                                linearray.append(TLine((X+1)*pitch,-xmax,(X+1)*pitch,xmax))
+                                linearray[-1].SetLineColor(3)
+                                linearray.append(CreateTLines(xmax,U-1,angles[1],pitch))
+                                linearray[-1].SetLineColor(3)
+                                linearray.append(CreateTLines(xmax,V-1,angles[2],pitch))
+                                linearray[-1].SetLineColor(3)
+                                linearray.append(CreateTLines(xmax,Y-1,angles[3],pitch))
+                                linearray[-1].SetLineColor(3)
+                                linearray.append(CreateTLines(xmax,U+1,angles[1],pitch))
+                                linearray[-1].SetLineColor(3)
+                                linearray.append(CreateTLines(xmax,V+1,angles[2],pitch))
+                                linearray[-1].SetLineColor(3)
+                                linearray.append(CreateTLines(xmax,Y+1,angles[3],pitch))
+                                linearray[-1].SetLineColor(3)
         for line in linearray:
                 line.Draw("SAME")
                                
@@ -524,11 +541,13 @@ def GetEfficiency(allHits,XY,pitch,tolerance):
                 for reco in allHits:
                         if math.sqrt((true[0]-reco[0])**2 + (true[1]-reco[1])**2)<pitch*tolerance:
                                 passed=True
+                                break
                 if passed ==True:
                         nFound+=1.0
 
 
         return nFound/(float)(nExpected)
+
 
 def GetPixelArea(hit,angles,pitch):
 
@@ -546,6 +565,14 @@ def GetPixelArea(hit,angles,pitch):
 
         return area
         
+def CheckPixelAreas(allHits,areaTolerance,pitch,angles):
+
+        acceptedHits=[]
+        for hit in allHits:
+                if GetPixelArea(hit,angles,pitch)<areaTolerance:
+                        acceptedHits.append(hit)
+        return acceptedHits
+
 
 def RemoveAmbiguities(inHits,rawAngle,pitch):
 
