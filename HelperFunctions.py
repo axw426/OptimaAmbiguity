@@ -67,6 +67,7 @@ def GetTrackerStripCoOrds(XY,mXmY,pitch,angles,Z):
         StripHalfV=[]
         StripHalfY=[]
         
+        
         for coord,direction in zip(XY,mXmY):
                 #updated pos=X0+mX*Z
                 #print(angles[0],angles[1])
@@ -94,8 +95,14 @@ def GetTrackerStripCoOrds(XY,mXmY,pitch,angles,Z):
                         StripY.append(ConvertXYToStrip(coordY,pitch,angles[3]))
                         StripHalfY.append(CheckStripHalf(coordY,pitch,angles[3]))
 	        Strips= [StripX,StripU,StripV,StripY,StripHalfX,StripHalfU,StripHalfV,StripHalfY]	
-
-        return Strips
+ 
+        meanZ=sum(Z)/len(Z)
+        meanXY=[]
+        for coord,direction in zip(XY,mXmY):
+                meanXY.append([coord[0]+direction[0]*meanZ,coord[1]+direction[1]*meanZ])
+                        
+                
+        return Strips,meanXY
 
 def GetStripCoOrds(XY,pitch,angles):
 	StripX=[]

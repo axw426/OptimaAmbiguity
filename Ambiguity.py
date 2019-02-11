@@ -100,7 +100,7 @@ for nMeanProton in range(10,11):
                         for hit in allHits:
                                 myHitMap.Fill(hit[0],hit[1])
                                 
-                        rawEff=hf.GetEfficiency(allHits,XY,pitch,effTolerance)
+                        rawEff=hf.GetEfficiency(allHits,XY,pitch,tolerance)
                         hRawEfficiency.Fill(100.0*rawEff)
                         nProton_RawEffCorrected+=nProton*rawEff
 

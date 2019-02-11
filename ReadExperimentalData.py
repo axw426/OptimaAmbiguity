@@ -49,7 +49,7 @@ for i in range(len(hitsByTimestamp)):
         
         #print(StripX,StripU,StripV)
         #find hits
-        allHits=hf.FindOverlaps([StripX,StripU,StripV,StripX,StripU,StripV],pitch,angles,tolerance,False) #stripx,U,V soubled here as find overlaps expects info on which half of a plane a sensor is in...
+        allHits=hf.FindOverlaps([StripX,StripU,StripV,StripX,StripU,StripV],pitch,angles,tolerance,False) #strips X,U,V doubled here as find overlaps expects info on which half of a plane a sensor is in...
         reconstructedHits+=len(allHits)
         #add results to hit map
         for hit in allHits:

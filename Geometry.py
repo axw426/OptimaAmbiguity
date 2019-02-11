@@ -17,6 +17,9 @@ interPlaneDistance=12.0*1000 #um
 interModuleDistance=100.0*1000 #um
 phantomGap=80.0*1000 #um
 
+geometryNames=["1ModuleXY","1ModuleXUV","2ModuleXY","2ModuleXUV","4ModuleXY","4ModuleXUV"]
+
+
 def init(geoname):
 
         pitch=100.0
@@ -27,7 +30,7 @@ def init(geoname):
 
         if  geoname=="1ModuleXUV":
 
-                stripTolerance=0.67 # maximum radial distance for an equilateral triangle is 2/3 height
+                stripTolerance=1.0 # maximum radial distance for an equilateral triangle is 2/3 height, plus wiggle room for Z separation + cases with merged hits
                 effTolerance=stripTolerance
                 trackTolerance=stripTolerance*pitch 
                 pos=0
@@ -70,7 +73,7 @@ def init(geoname):
 
         elif  geoname=="2ModuleXUV":
 
-                stripTolerance=0.67
+                stripTolerance=1.0
 
                 trackTolerance=stripTolerance*pitch 
                 pos=0
@@ -112,7 +115,7 @@ def init(geoname):
 
         elif  geoname=="4ModuleXUV":
 
-                stripTolerance=0.67
+                stripTolerance=1.0
                 
                 totalDistance=4*interPlaneDistance+2*interModuleDistance+phantomGap
 
@@ -137,5 +140,10 @@ def init(geoname):
                 TrackerAngles.append([30,90,150])
                 TrackerZ.append([pos,pos+interPlaneDistance,pos+2*interPlaneDistance])        
 
-
+        else:
+                print "\nWarning! Tried to use geometry: "+geoname+", but no such geometry exists!\n"
+                print "Available geometries are:"
+                for  i in geometryNames:
+                        print i
+                quit()
         return TrackerAngles,TrackerZ,stripTolerance,trackTolerance,effTolerance,pitch,beamSpread
