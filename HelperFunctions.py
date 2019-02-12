@@ -765,7 +765,6 @@ def ReconstructTracks4Planes(Hits,trackTolerance,pitch):
                                                         bestLPos=l
                                                         bestChi2=chi2
 
-                #print("bestChi2=",bestChi2,[Hits[0][bestIPos],Hits[1][bestJPos],Hits[2][bestKPos],Hits[3][bestLPos]])
                 if bestChi2<trackTolerance : #NEED TO DECIDE SENSIBLE VALUE
                         #Append hit positions to track list
                         RecoTracks.append([Hits[0][bestIPos],Hits[1][bestJPos],Hits[2][bestKPos],Hits[3][bestLPos]])
@@ -780,15 +779,25 @@ def ReconstructTracks4Planes(Hits,trackTolerance,pitch):
 
         return RecoTracks
 
-def ReconstructTracks(Hits,trackTolerance,pitch):
+def ReconstructTracks(Hits,trackTolerance,pitch,MaxNTracks):
 
         if len(Hits)==2:
-                return ReconstructTracks2Planes(Hits,trackTolerance,pitch)   
+                AllTracks=ReconstructTracks2Planes(Hits,trackTolerance,pitch)   
         elif len(Hits)==4:
-                return ReconstructTracks4Planes(Hits,trackTolerance,pitch)
+                AllTracks=ReconstructTracks4Planes(Hits,trackTolerance,pitch)
         else:
                 print("Can only cope with 2 or 4 tracker modules!")
-              
+                quit()
+                
+        if len(AllTracks)>MaxNTracks:
+                #print("Found an excess of tracks, NTracks=",len(AllTracks),"Max allowed=",MaxNTracks)
+                SelectedTracks=AllTracks[0:MaxNTracks]
+                #print("New selected tracks length=",len(SelectedTracks))
+        else:
+                SelectedTracks=AllTracks
+                
+        return SelectedTracks
+        
 def DrawTrackMap(name,Tracks,XY,xmax):
 
         truth=TH2F("Truth","Hit Locations",1000,-xmax,xmax,1000,-xmax,xmax)
