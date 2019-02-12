@@ -67,7 +67,6 @@ def GetTrackerStripCoOrds(XY,mXmY,pitch,angles,Z):
         StripHalfV=[]
         StripHalfY=[]
         
-        
         for coord,direction in zip(XY,mXmY):
                 #updated pos=X0+mX*Z
                 #print(angles[0],angles[1])
@@ -113,7 +112,6 @@ def GetStripCoOrds(XY,pitch,angles):
         StripHalfU=[]
         StripHalfV=[]
         StripHalfY=[]
-        
         for coord in XY:
                 StripX.append(ConvertXYToStrip(coord,pitch,angles[0]))
 		StripU.append(ConvertXYToStrip(coord,pitch,angles[1]))
@@ -862,22 +860,23 @@ def GetTrackSeparation(trueTrack,recoTrack):
         #print separation
         return separation
         
-def GetTrackEfficiency(effTolerance,XY,mXmY,RecoTracks,TrackerPositions,pitch):
+def GetTrackEfficiency(effTolerance,XY,mXmY,RecoTracks,TrackerZ,pitch):
 
         #if only one module, tracks are just hits for one module
-        if len(TrackerPositions)==1:
+        if len(TrackerZ)==1:
                return GetEfficiency(RecoTracks,XY,pitch,effTolerance)
 
         
         nTrueFound=0.0
-        TrackerZ=[]
-        for positions in TrackerPositions:
-                TrackerZ+=positions
+        TrackerPositions=[]
+        for z in TrackerZ:
+                TrackerPositions.append(sum(z)/len(z))
+        #print TrackerPositions
         
         for coord,direction in zip(XY,mXmY):
                 trueTrack=[]
-                for Z in TrackerZ:
-                        trueTrack.append([coord[0]+direction[0]*Z,coord[1]+direction[1]*Z])
+                for position in TrackerPositions:
+                        trueTrack.append([coord[0]+direction[0]*position,coord[1]+direction[1]*position])
                 #loop over tracks and see if one matches at each point within tolerance
                 for recoTrack in RecoTracks:
                         if GetTrackSeparation(trueTrack,recoTrack)<effTolerance:
@@ -947,3 +946,25 @@ def ReadJohnFile(inFile):
         hUStrips.Write()
         hVStrips.Write()
         return hitsByTimestamp
+
+def CheckInsideDetectorArea(Hits,pitch,size,angles):
+
+        acceptedHits=[]
+
+        maxStrip=size*10000.0/(2*pitch)
+        
+        for hit in Hits:
+                coord=[[hit[0],hit[1]]]
+                Strips=GetStripCoOrds(coord,pitch,angles)[0]
+                passed=True
+                for strip in Strips:
+                        if abs(strip)>maxStrip:
+                                passed=False
+                                break
+                if passed==True:
+                     acceptedHits.append(hit)
+                else:
+                        print "Failed acceptance test"
+                        print Strips
+
+        return acceptedHits

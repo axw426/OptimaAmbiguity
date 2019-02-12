@@ -12,6 +12,8 @@ hf.SetSeed(2022)
 
 beamSpread=3.0 #mrad
 
+size=20 #cm
+
 sensorThickness=155.0 #um
 interPlaneDistance=12.0*1000 #um
 interModuleDistance=100.0*1000 #um
@@ -23,7 +25,6 @@ geometryNames=["1ModuleXY","1ModuleXUV","2ModuleXY","2ModuleXUV","4ModuleXY","4M
 def init(geoname):
 
         pitch=100.0
-        effTolerance=2500 #needs to be thought about...
 
         TrackerAngles=[]
         TrackerZ=[]
@@ -146,4 +147,19 @@ def init(geoname):
                 for  i in geometryNames:
                         print i
                 quit()
-        return TrackerAngles,TrackerZ,stripTolerance,trackTolerance,effTolerance,pitch,beamSpread
+
+        effTolerance=pitch*len(TrackerZ)*len(TrackerZ[0]) #needs to be thought about, should be sum or errors in single points + error from non-parallel (+ fudgefactor for allignment in experiment)...
+
+                
+        print "\n##########################   Geometry   ##########################"
+        print "Setting up geometry: "+geoname
+        print "Total sensor size= ",size," cm"
+        print "Pitch= ",pitch
+        print "Tracker Angles= ",TrackerAngles
+        print "Tracker Positions= ",TrackerZ
+        print "Strip Tolerance (maximum separation of strip intersections)= ",pitch*stripTolerance
+        print "Track Tolerance (maximum deviation from parallel beam to accept tracking)= ",trackTolerance
+        print "Efficiency Tolerance (maximum combined deviation of tracks hits from true hits)= ",effTolerance
+        print "###################################################################\n"
+        
+        return TrackerAngles,TrackerZ,stripTolerance,trackTolerance,effTolerance,pitch,beamSpread,size

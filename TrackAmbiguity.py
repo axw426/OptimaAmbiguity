@@ -16,11 +16,6 @@ width=25 #mm #sigma
 posX=0.0 #cm
 posY=0.0 #cm
 
-#NLoops=10
-pitch=100.0
-size=20 #cm
-xmax=size*5000
-
 #read command line options
 parser=argparse.ArgumentParser(description="Script for controlling tracker ambiguity studies")
 parser.add_argument("-l","--nLoops",help="Number of times NProtons will be fired, default is 100",type=int,default=100)
@@ -45,8 +40,9 @@ if args.useHalfStrips>0:
 else:
         useHalfStrips=False
 
-TrackerAngles,TrackerZ,stripTolerance,trackTolerance,effTolerance,pitch,beamSpread=geo.init(geoName)
-print "Using geometry"+geoName,TrackerAngles,TrackerZ,stripTolerance,trackTolerance,effTolerance,pitch,beamSpread
+TrackerAngles,TrackerZ,stripTolerance,trackTolerance,effTolerance,pitch,beamSpread,size=geo.init(geoName)
+#print "Using geometry"+geoName,TrackerAngles,TrackerZ,stripTolerance,trackTolerance,effTolerance,pitch,beamSpread,size
+xmax=size*5000
 
 #Strip tolerance: arises from spacial separation of XU, XV, and UV overlaps, irrelevant for two strip configuration as only one point of intersection
 #Efficiency tolerance: accounts for difference between reconstructed and true hit positions- essentially combination of hit efficiency and ambiguity in association of hits to form tracks
@@ -66,8 +62,8 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
         #reset output file and setup histograms for loop
         MyFile =TFile("tracking.root","RECREATE");
         for i in range(NLoops):
-                if i%1 == 0:
-                        print("Processing loop "+(str)(i))
+                if i%10 == 0:
+                        print("Processing loop "+(str)(i)+" of "+(str)(NLoops))
 
                 #get nProtons according to possion distribution
                 if args.poisson>0:
@@ -91,6 +87,7 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
                         MaxNStrips.append(len(max(Strips,key=len)))                        
                         
                         Hits=hf.FindOverlaps(Strips,pitch,TrackerAngles[module],stripTolerance,useHalfStrips)
+                        Hits=hf.CheckInsideDetectorArea(Hits,pitch,size,TrackerAngles[module])
                         Hits=hf.MergeAdjacentHits(Hits,stripTolerance,pitch)
                         TrackerHits.append(Hits)
                         nTrackerHits[module]+=len(Hits)
@@ -121,9 +118,9 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
                 efficiency+=hf.GetTrackEfficiency(effTolerance,XY,mXmY,RecoTracks,TrackerZ,pitch)
                 
         for module in range(len(TrackerAngles)):
-                print "Module ",module,": Hits= ",nTrackerHits[module]," Ambiguity= ",100*(nTrackerHits[module]-totalProtons)/totalProtons,"%"," Efficiency=",100*sum(trackerEffs[module])/len(trackerEffs[module])
+                print "Module ",module,": Hits= ",nTrackerHits[module]," Ambiguity= ",100*(nTrackerHits[module]-totalProtons)/totalProtons,"%"," Efficiency=",100*sum(trackerEffs[module])/len(trackerEffs[module]),"Efficiency correced ambiguity= ",100*((nTrackerHits[module]/(sum(trackerEffs[module])/len(trackerEffs[module])))-totalProtons)/totalProtons,"%"
 
 
-        print "Combined: Tracks= ",nCombinedHits," Ambiguity= ",100*(nCombinedHits-totalProtons)/totalProtons,"%", "Efficiency=",100*efficiency/NLoops
+        print "Combined: Tracks= ",nCombinedHits," Ambiguity= ",100*(nCombinedHits-totalProtons)/totalProtons,"%", "Efficiency=",100*efficiency/NLoops,"Efficiency correced ambiguity= ", 100*((nCombinedHits/(efficiency/NLoops))-totalProtons)/totalProtons,"%"
 
 
