@@ -41,7 +41,7 @@ def init(geoname):
         
         elif  geoname=="1ModuleXY":
 
-                stripTolerance=0.0
+                stripTolerance=math.sqrt(2.0)/2.0
                 effTolerance=math.sqrt(2.0)/2.0
                 trackTolerance=stripTolerance*pitch 
                 pos=0
@@ -53,7 +53,7 @@ def init(geoname):
         
         elif geoname=="2ModuleXY":
 
-                stripTolerance=0.0
+                stripTolerance=math.sqrt(2.0)/2.0
                 
                 #trackTolerance=2*math.tan(beamSpread/1000.0)*interModuleDistance
                 trackTolerance=10

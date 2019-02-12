@@ -21,12 +21,12 @@ posX=0.0 #cm
 posY=0.0 #cm
 
 #X-Y
-#tolerance=0.0 #no need for tolerance as X-Y guaranteed to overlap
-#angles=[0,90]
+tolerance=math.sqrt(2.0)/2.0 #no need for tolerance as X-Y guaranteed to overlap
+angles=[0,90]
 
 #X-U-V
-tolerance=0.67 #~pitch*2/3 (triangle innit), area=5774.0 for 100um
-angles=[0,60,120]
+#tolerance=0.67 #~pitch*2/3 (triangle innit), area=5774.0 for 100um
+#angles=[0,60,120]
 
 #X-U-V-Y
 #tolerance=1.5 #needed for 4 planes, why?
