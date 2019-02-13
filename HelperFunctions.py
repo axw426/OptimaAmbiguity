@@ -872,18 +872,40 @@ def GetTrackEfficiency(effTolerance,XY,mXmY,RecoTracks,TrackerZ,pitch):
         for z in TrackerZ:
                 TrackerPositions.append(sum(z)/len(z))
         #print TrackerPositions
-        
+
+        #loop over all true tracks
         for coord,direction in zip(XY,mXmY):
                 trueTrack=[]
                 for position in TrackerPositions:
                         trueTrack.append([coord[0]+direction[0]*position,coord[1]+direction[1]*position])
-                #loop over tracks and see if one matches at each point within tolerance
+                #loop over reco tracks and see if any match within a tolerance
                 for recoTrack in RecoTracks:
                         if GetTrackSeparation(trueTrack,recoTrack)<effTolerance:
                                 nTrueFound+=1.0
                                 break
 
         return nTrueFound/(float)(len(XY))
+
+def WriteTracks(outfilename,RecoTracks,ZMeans,loop):
+
+        outString=(str)(loop)       
+        f= open(outfilename,"a+")
+        for module in range(len(ZMeans)):
+                for track in range(5):
+                        if len(RecoTracks)>track:
+                                hit=RecoTracks[track][module]
+                                x=hit[0]
+                                y=hit[1]
+                                z=ZMeans[module]
+                        else:
+                                x=-1
+                                y=-1
+                                z=-1
+                        outString+=" "+(str)(x)+" "+(str)(y)+" "+(str)(z)
+
+                        
+        f.write(outString+"\n")
+        f.close()
 
 def ReadJohnFile(inFile):
         lastTimestamp=-1

@@ -89,7 +89,7 @@ def init(geoname):
 
         elif geoname=="4ModuleXY":
 
-                stripTolerance=0.0
+                stripTolerance=math.sqrt(2.0)/2.0
 
                 totalDistance=4*interPlaneDistance+2*interModuleDistance+phantomGap
 
@@ -149,7 +149,10 @@ def init(geoname):
                 quit()
 
         effTolerance=pitch*len(TrackerZ)*len(TrackerZ[0]) #needs to be thought about, should be sum or errors in single points + error from non-parallel (+ fudgefactor for allignment in experiment)...
-
+        ZMeans=[]
+        for z in TrackerZ:
+                ZMeans.append(sum(z)/len(z))
+        
                 
         print "\n##########################   Geometry   ##########################"
         print "Setting up geometry: "+geoname
@@ -162,4 +165,4 @@ def init(geoname):
         print "Efficiency Tolerance (maximum combined deviation of tracks hits from true hits)= ",effTolerance
         print "###################################################################\n"
         
-        return TrackerAngles,TrackerZ,stripTolerance,trackTolerance,effTolerance,pitch,beamSpread,size
+        return TrackerAngles,TrackerZ, ZMeans,stripTolerance,trackTolerance,effTolerance,pitch,beamSpread,size

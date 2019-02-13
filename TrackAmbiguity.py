@@ -40,7 +40,7 @@ if args.useHalfStrips>0:
 else:
         useHalfStrips=False
 
-TrackerAngles,TrackerZ,stripTolerance,trackTolerance,effTolerance,pitch,beamSpread,size=geo.init(geoName)
+TrackerAngles,TrackerZ,ZMeans,stripTolerance,trackTolerance,effTolerance,pitch,beamSpread,size=geo.init(geoName)
 #print "Using geometry"+geoName,TrackerAngles,TrackerZ,stripTolerance,trackTolerance,effTolerance,pitch,beamSpread,size
 xmax=size*5000
 
@@ -50,6 +50,11 @@ xmax=size*5000
 
 #gStyle.SetOptStat(0000)
 gROOT.SetBatch(True)
+
+outfilename="tracking.txt"
+f= open(outfilename,"w+")
+f.close
+
 
 for nMeanProton in range(minProtons,minProtons+protonRange):
 
@@ -110,6 +115,8 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
                         RecoTracks=hf.ReconstructTracks(TrackerHits,trackTolerance,pitch,MaxNTracks)
                 else:
                         RecoTracks=TrackerHits[0]
+
+                hf.WriteTracks(outfilename,RecoTracks,ZMeans,i)
                         
                 nCombinedHits+=len(RecoTracks)
                 if saveStripMaps and len(TrackerAngles)>1:
