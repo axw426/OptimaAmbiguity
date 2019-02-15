@@ -671,6 +671,7 @@ def FindRadius(i,j):
 
         return math.sqrt((i[0]-j[0])**2 + (i[1]-j[1])**2)
 
+
 def ReconstructTracks2Planes(Hits,tolerance,pitch):
 
         RecoTracks=[]
@@ -689,8 +690,7 @@ def ReconstructTracks2Planes(Hits,tolerance,pitch):
                                         bestIPos=i
                                         bestJPos=j
                                         minimumSeparation=r
-               # print minimumSeparation
-                if minimumSeparation<tolerance*pitch:
+                if minimumSeparation<tolerance:
                         #Append hit positions to track list
                         RecoTracks.append([Hits[0][bestIPos],Hits[1][bestJPos]])
                         #delete entries from Hits
@@ -851,15 +851,28 @@ def DrawTrackMap(name,Tracks,XY,xmax):
         
 
 
-def GetTrackSeparation(trueTrack,recoTrack):
+#def GetTrackSeparation(trueTrack,recoTrack):
+#
+#        separation=0.0
+#        
+#        for trueHit,recoHit in zip(trueTrack,recoTrack):
+#                separation +=math.sqrt((trueHit[0]-recoHit[0])**2 + (trueHit[1]-recoHit[1])**2)
+#        #print separation
+#        return separation
 
-        separation=0.0
+def GetTrackSeparation(trueTrack,recoTrack,effTolerance):
+
+        passed=True
         
         for trueHit,recoHit in zip(trueTrack,recoTrack):
-                separation +=math.sqrt((trueHit[0]-recoHit[0])**2 + (trueHit[1]-recoHit[1])**2)
-        #print separation
-        return separation
-        
+                #for every point on track check if the true and reconstructed hits agree
+                separation=math.sqrt((trueHit[0]-recoHit[0])**2 + (trueHit[1]-recoHit[1])**2)
+                if separation>effTolerance:
+                        #print separation
+                        passed=False
+                        break
+        return passed
+                
 def GetTrackEfficiency(effTolerance,XY,mXmY,RecoTracks,TrackerZ,pitch):
 
         #if only one module, tracks are just hits for one module
@@ -867,20 +880,21 @@ def GetTrackEfficiency(effTolerance,XY,mXmY,RecoTracks,TrackerZ,pitch):
                return GetEfficiency(RecoTracks,XY,pitch,effTolerance)
 
         
-        nTrueFound=0.0
         TrackerPositions=[]
         for z in TrackerZ:
                 TrackerPositions.append(sum(z)/len(z))
-        #print TrackerPositions
 
-        #loop over all true tracks
+        nTrueFound=0.0
+                
+        #loop over all true protons
         for coord,direction in zip(XY,mXmY):
+                #create a track for the true proton 
                 trueTrack=[]
                 for position in TrackerPositions:
                         trueTrack.append([coord[0]+direction[0]*position,coord[1]+direction[1]*position])
                 #loop over reco tracks and see if any match within a tolerance
                 for recoTrack in RecoTracks:
-                        if GetTrackSeparation(trueTrack,recoTrack)<effTolerance:
+                        if GetTrackSeparation(trueTrack,recoTrack,effTolerance):
                                 nTrueFound+=1.0
                                 break
 

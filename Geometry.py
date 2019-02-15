@@ -10,7 +10,7 @@ hf.SetSeed(2022)
 
 #stripTolerance=1.5 #4 planes per module...for some reason- shape varies depending on position
 
-beamSpread=3.0 #mrad
+beamSpread=2.0 #mrad
 
 size=20 #cm
 
@@ -32,7 +32,6 @@ def init(geoname):
         if  geoname=="1ModuleXUV":
 
                 stripTolerance=1.0 # maximum radial distance for an equilateral triangle is 2/3 height, plus wiggle room for Z separation + cases with merged hits
-                effTolerance=stripTolerance
                 trackTolerance=stripTolerance*pitch 
                 pos=0
 
@@ -43,7 +42,6 @@ def init(geoname):
         elif  geoname=="1ModuleXY":
 
                 stripTolerance=math.sqrt(2.0)/2.0
-                effTolerance=math.sqrt(2.0)/2.0
                 trackTolerance=stripTolerance*pitch 
                 pos=0
 
@@ -54,11 +52,12 @@ def init(geoname):
         
         elif geoname=="2ModuleXY":
 
-                stripTolerance=math.sqrt(2.0)/2.0
-                
-                #trackTolerance=2*math.tan(beamSpread/1000.0)*interModuleDistance
-                trackTolerance=10
-                
+                #stripTolerance=math.sqrt(2.0)/2.0
+                stripTolerance=0.8 #needs to be slightly higher than expected due to separation between planes
+
+                #add error from strip tolerance + deviation from parallel beams
+                trackTolerance=2*math.tan(beamSpread/1000.0)*interModuleDistance + stripTolerance*pitch
+
                 pos=0
 
                 TrackerAngles.append([0,90])
@@ -76,7 +75,9 @@ def init(geoname):
 
                 stripTolerance=1.0
 
-                trackTolerance=stripTolerance*pitch 
+                #add error from strip tolerance + deviation from parallel beams
+                trackTolerance=2*math.tan(beamSpread/1000.0)*interModuleDistance + stripTolerance*pitch
+
                 pos=0
 
                 TrackerAngles.append([0,60,120])
@@ -89,11 +90,12 @@ def init(geoname):
 
         elif geoname=="4ModuleXY":
 
-                stripTolerance=math.sqrt(2.0)/2.0
+                #stripTolerance=math.sqrt(2.0)/2.0
+                stripTolerance=0.8 #needs to be slightly higher than expected due to separation between planes
 
                 totalDistance=4*interPlaneDistance+2*interModuleDistance+phantomGap
+                trackTolerance=2*math.tan(beamSpread/1000.0)*totalDistance + stripTolerance*pitch
 
-                trackTolerance=2*math.tan(beamSpread/1000.0)*totalDistance 
                 pos=0
 
                 TrackerAngles.append([0,90])
@@ -119,8 +121,8 @@ def init(geoname):
                 stripTolerance=1.0
                 
                 totalDistance=4*interPlaneDistance+2*interModuleDistance+phantomGap
+                trackTolerance=2*math.tan(beamSpread/1000.0)*totalDistance + stripTolerance*pitch
 
-                trackTolerance=2*math.tan(beamSpread/1000.0)*totalDistance +500 
                 pos=0
 
                 TrackerAngles.append([0,60,120])
@@ -148,7 +150,7 @@ def init(geoname):
                         print i
                 quit()
 
-        effTolerance=pitch*len(TrackerZ)*len(TrackerZ[0]) #needs to be thought about, should be sum or errors in single points + error from non-parallel (+ fudgefactor for allignment in experiment)...
+       
         ZMeans=[]
         for z in TrackerZ:
                 ZMeans.append(sum(z)/len(z))
@@ -162,7 +164,6 @@ def init(geoname):
         print "Tracker Positions= ",TrackerZ
         print "Strip Tolerance (maximum separation of strip intersections)= ",pitch*stripTolerance
         print "Track Tolerance (maximum deviation from parallel beam to accept tracking)= ",trackTolerance
-        print "Efficiency Tolerance (maximum combined deviation of tracks hits from true hits)= ",effTolerance
         print "###################################################################\n"
         
-        return TrackerAngles,TrackerZ, ZMeans,stripTolerance,trackTolerance,effTolerance,pitch,beamSpread,size
+        return TrackerAngles,TrackerZ, ZMeans,stripTolerance,trackTolerance,pitch,beamSpread,size

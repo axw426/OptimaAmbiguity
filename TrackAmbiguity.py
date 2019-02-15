@@ -40,8 +40,8 @@ if args.useHalfStrips>0:
 else:
         useHalfStrips=False
 
-TrackerAngles,TrackerZ,ZMeans,stripTolerance,trackTolerance,effTolerance,pitch,beamSpread,size=geo.init(geoName)
-#print "Using geometry"+geoName,TrackerAngles,TrackerZ,stripTolerance,trackTolerance,effTolerance,pitch,beamSpread,size
+TrackerAngles,TrackerZ,ZMeans,stripTolerance,trackTolerance,pitch,beamSpread,size=geo.init(geoName)
+#print "Using geometry"+geoName,TrackerAngles,TrackerZ,stripTolerance,trackTolerance,pitch,beamSpread,size
 xmax=size*5000
 
 #Strip tolerance: arises from spacial separation of XU, XV, and UV overlaps, irrelevant for two strip configuration as only one point of intersection
@@ -59,15 +59,26 @@ f.close
 for nMeanProton in range(minProtons,minProtons+protonRange):
 
         totalProtons=0.0
-        nCombinedHits=0.0
-        efficiency=0.0
-        nTrackerHits=[0.0]*len(TrackerAngles)
-        trackerEffs=[[]]*len(TrackerAngles)
 
+        nTracks=[]
+        trackEfficiency=[]
+        trackAmbiguity=[]
+        correctedTrackAmbiguity=[]
+
+        nTrackerHits=[]
+        trackerEffs=[]
+        ambiguity=[]
+        correctedAmbiguity=[]
+        for i in range(len(TrackerAngles)):
+                nTrackerHits.append([])
+                trackerEffs.append([])
+                ambiguity.append([])
+                correctedAmbiguity.append([])
+        
         #reset output file and setup histograms for loop
         MyFile =TFile("tracking.root","RECREATE");
         for i in range(NLoops):
-                if i%10 == 0:
+                if i%1 == 0:
                         print("Processing loop "+(str)(i)+" of "+(str)(NLoops))
 
                 #get nProtons according to possion distribution
@@ -80,54 +91,71 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
                 #get proton starting positions and angular distributions
                 XY=hf.GetRandomXY(nProton,size,width,posX,posY)
                 mXmY=hf.GetDirections(nProton,beamSpread,False)
-                
+
+                #reconstruct hits for each tracker module
                 TrackerHits=[]
                 MaxNStrips=[]
                 for module in range(len(TrackerAngles)):
                                        
-                        #get hits for each set of trackers
-                        #returns hit objects of form (XCoord,YCoord,[stripX,stripU,stripV],[radial distance to intersections])
+                        #convert simulated protons to strips 
                         Strips,meanXY=hf.GetTrackerStripCoOrds(XY,mXmY,pitch,TrackerAngles[module],TrackerZ[module])
                         #keep track of maximum number of strips in each module
                         MaxNStrips.append(len(max(Strips,key=len)))                        
-                        
+
+                        #find overlap of strips and return hit objects of form (XCoord,YCoord,[stripX,stripU,stripV],[radial distance to intersections])
                         Hits=hf.FindOverlaps(Strips,pitch,TrackerAngles[module],stripTolerance,useHalfStrips)
+                        #verify that hits are reconstructed within correct area
                         Hits=hf.CheckInsideDetectorArea(Hits,pitch,size,TrackerAngles[module])
+                        #look for obvious cases of fake hits (adjacent to each other) and merge them by averaging x-y cooords
                         Hits=hf.MergeAdjacentHits(Hits,stripTolerance,pitch)
                         TrackerHits.append(Hits)
-                        nTrackerHits[module]+=len(Hits)
-                        trackerEffs[module].append(hf.GetEfficiency(Hits,meanXY,pitch,stripTolerance))
+                        nTrackerHits[module].append(len(Hits))
 
-                        #print XY
+                        #calculate efficiency for finding correct hits by checking there is always a reco hit within tolerance of true hit
+                        eff=hf.GetEfficiency(Hits,meanXY,pitch,stripTolerance)
+                        trackerEffs[module].append(100*eff)
+
+                        #calculate ambiguity
+                        ambiguity[module].append(100*(float)(len(Hits)-nProton)/len(Hits))
+                        nFakeHits=len(Hits)- (nProton*eff)
+                        
+                        #correctedAmbiguity.append(100*((len(Hits)/eff)-nProton)/nProton)
+                        correctedAmbiguity[module].append(100*nFakeHits/len(Hits))
+
+                        #if module==0:
+                        #        print nTrackerHits[module][-1],trackerEffs[module][-1],ambiguity[module][-1],nFakeHits,correctedAmbiguity[module][-1]
+                        
                         if saveStripMaps:
                                 hf.PlotHitMap("Tracker"+(str)(module)+"Hits",TrackerHits[module],XY,Strips,pitch,size,i,TrackerAngles[module])
 
-                        #for hit in Tracker1Hits:
-                        #        area=hf.GetPixelArea(hit,Tracker1Angles,pitch)
-                        #        print "Area=",area,hit
-
-
-                                 
                 #reconstruct tracks
                 MaxNTracks=max(MaxNStrips)
-                
                 if len(TrackerAngles)>1:
                         RecoTracks=hf.ReconstructTracks(TrackerHits,trackTolerance,pitch,MaxNTracks)
+                        hf.WriteTracks(outfilename,RecoTracks,ZMeans,i)
                 else:
                         RecoTracks=TrackerHits[0]
+                     
+                nTracks.append(len(RecoTracks))
 
-                hf.WriteTracks(outfilename,RecoTracks,ZMeans,i)
-                        
-                nCombinedHits+=len(RecoTracks)
+                #get track efficiency
+                eff=hf.GetTrackEfficiency(stripTolerance*pitch,XY,mXmY,RecoTracks,TrackerZ,pitch)
+                trackEfficiency.append(100*eff)
+
+                #calculate track ambiguity rate
+                trackAmbiguity.append(100*(len(RecoTracks)-nProton)/len(RecoTracks))
+                nFakeTracks=len(RecoTracks)-(nProton*eff)
+                correctedTrackAmbiguity.append(100*nFakeTracks/len(RecoTracks))
+                
                 if saveStripMaps and len(TrackerAngles)>1:
                         hf.DrawTrackMap("TrackMap",RecoTracks,XY,xmax)
 
-                efficiency+=hf.GetTrackEfficiency(effTolerance,XY,mXmY,RecoTracks,TrackerZ,pitch)
                 
+
         for module in range(len(TrackerAngles)):
-                print "Module ",module,": Hits= ",nTrackerHits[module]," Ambiguity= ",100*(nTrackerHits[module]-totalProtons)/totalProtons,"%"," Efficiency=",100*sum(trackerEffs[module])/len(trackerEffs[module]),"Efficiency correced ambiguity= ",100*((nTrackerHits[module]/(sum(trackerEffs[module])/len(trackerEffs[module])))-totalProtons)/totalProtons,"%"
+                print "Module ",module,": Hits= ",sum(nTrackerHits[module])," Ambiguity= ",np.mean(ambiguity[module]),"%"," Efficiency=",np.mean(trackerEffs[module]),"Efficiency corrected ambiguity= ",np.mean(correctedAmbiguity[module]),"%"
 
 
-        print "Combined: Tracks= ",nCombinedHits," Ambiguity= ",100*(nCombinedHits-totalProtons)/totalProtons,"%", "Efficiency=",100*efficiency/NLoops,"Efficiency correced ambiguity= ", 100*((nCombinedHits/(efficiency/NLoops))-totalProtons)/totalProtons,"%"
+        print "Combined: Tracks= ",sum(nTracks)," Ambiguity= ",np.mean(trackAmbiguity),"%"," Efficiency=",np.mean(trackEfficiency),"Efficiency corrected ambiguity= ",np.mean(correctedTrackAmbiguity),"%"
 
 
