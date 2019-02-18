@@ -53,7 +53,7 @@ def init(geoname):
         elif geoname=="2ModuleXY":
 
                 #stripTolerance=math.sqrt(2.0)/2.0
-                stripTolerance=0.8 #needs to be slightly higher than expected due to separation between planes
+                stripTolerance=0.9 #needs to be slightly higher than expected due to separation between planes
 
                 #add error from strip tolerance + deviation from parallel beams
                 trackTolerance=2*math.tan(beamSpread/1000.0)*interModuleDistance + stripTolerance*pitch
@@ -91,7 +91,7 @@ def init(geoname):
         elif geoname=="4ModuleXY":
 
                 #stripTolerance=math.sqrt(2.0)/2.0
-                stripTolerance=0.8 #needs to be slightly higher than expected due to separation between planes
+                stripTolerance=0.9 #needs to be slightly higher than expected due to separation between planes
 
                 totalDistance=4*interPlaneDistance+2*interModuleDistance+phantomGap
                 trackTolerance=2*math.tan(beamSpread/1000.0)*totalDistance + stripTolerance*pitch

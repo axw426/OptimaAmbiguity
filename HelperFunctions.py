@@ -777,7 +777,7 @@ def ReconstructTracks4Planes(Hits,trackTolerance,pitch):
 
         return RecoTracks
 
-def ReconstructTracks(Hits,trackTolerance,pitch,MaxNTracks):
+def ReconstructTracks(Hits,trackTolerance,pitch,MaxNTracks,restrictNTracks ):
 
         if len(Hits)==2:
                 AllTracks=ReconstructTracks2Planes(Hits,trackTolerance,pitch)   
@@ -787,7 +787,7 @@ def ReconstructTracks(Hits,trackTolerance,pitch,MaxNTracks):
                 print("Can only cope with 2 or 4 tracker modules!")
                 quit()
                 
-        if len(AllTracks)>MaxNTracks:
+        if restrictNTracks and len(AllTracks)>MaxNTracks:
                 #print("Found an excess of tracks, NTracks=",len(AllTracks),"Max allowed=",MaxNTracks)
                 SelectedTracks=AllTracks[0:MaxNTracks]
                 #print("New selected tracks length=",len(SelectedTracks))

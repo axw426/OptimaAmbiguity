@@ -4,9 +4,10 @@ import random
 import math
 import numpy as np
 from copy import deepcopy
-from ROOT import gROOT, TCanvas, TF1, TFile, gStyle,TH2F, TH1F
+from ROOT import gROOT, TCanvas, TF1, TFile, gStyle,TH2F, TH1F, TMultiGraph, TGraphErrors, TLegend
 import time
 import argparse
+from array import array
 
 hf.SetSeed(2022)
 np.random.seed(53234)
@@ -54,6 +55,9 @@ gROOT.SetBatch(True)
 outfilename="tracking.txt"
 f= open(outfilename,"w+")
 f.close
+
+_Efficiency,_Purity,_NumberOfProtons=array('d'),array('d'),array('d')
+_EfficiencyErr,_PurityErr,_NumberOfProtonsErr=array('d'),array('d'),array('d')
 
 
 for nMeanProton in range(minProtons,minProtons+protonRange):
@@ -130,8 +134,9 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
 
                 #reconstruct tracks
                 MaxNTracks=max(MaxNStrips)
+                restrictNTracks=False
                 if len(TrackerAngles)>1:
-                        RecoTracks=hf.ReconstructTracks(TrackerHits,trackTolerance,pitch,MaxNTracks)
+                        RecoTracks=hf.ReconstructTracks(TrackerHits,trackTolerance,pitch,MaxNTracks,restrictNTracks)
                         hf.WriteTracks(outfilename,RecoTracks,ZMeans,i)
                 else:
                         RecoTracks=TrackerHits[0]
@@ -158,4 +163,46 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
 
         print "Combined: Tracks= ",sum(nTracks)," Ambiguity= ",np.mean(trackAmbiguity),"%"," Efficiency=",np.mean(trackEfficiency),"Efficiency corrected ambiguity= ",np.mean(correctedTrackAmbiguity),"%"
 
+        _Efficiency.append(np.mean(trackEfficiency))
+        _Purity.append(100-np.mean(correctedTrackAmbiguity))
+        _NumberOfProtons.append(nMeanProton)
+        _EfficiencyErr.append(np.std(trackEfficiency)/math.sqrt(NLoops))
+        _PurityErr.append(np.std(correctedTrackAmbiguity)/math.sqrt(NLoops))
+        _NumberOfProtonsErr.append(0.0)
+                       
+canvas1 = TCanvas( 'c1', "mycanvas", 200, 10, 700, 500 )
 
+effGraph=TGraphErrors(len(_NumberOfProtons),_NumberOfProtons,_Efficiency,_NumberOfProtonsErr,_EfficiencyErr)
+effGraph.SetMarkerStyle(2)
+effGraph.SetMarkerSize(2)
+effGraph.GetXaxis().SetTitle("Mean N Proton")
+effGraph.GetYaxis().SetTitle("Efficiency/Purity (%)")
+effGraph.SetTitle("Efficiency")
+#effGraph.Draw("AP")
+
+purGraph=TGraphErrors(len(_NumberOfProtons),_NumberOfProtons,_Purity,_NumberOfProtonsErr,_PurityErr)
+purGraph.SetMarkerStyle(5)
+purGraph.SetLineColor(2)
+purGraph.SetMarkerColor(2)
+purGraph.SetMarkerSize(2)
+purGraph.GetXaxis().SetTitle("Mean N Proton")
+purGraph.GetYaxis().SetTitle("Purity")
+purGraph.SetTitle("Purity")
+MyFile =TFile("effVsPurity.root","RECREATE");
+
+mg=TMultiGraph()
+mg.SetTitle("Efficiency and Purity vs nProtons;Mean N Protons; (%)")
+mg.Add(effGraph,"lp")
+mg.Add(purGraph,"lp")
+mg.Draw("a")
+effGraph.Write()
+purGraph.Write()
+mg.Write()
+
+
+legend=TLegend(0.1,0.7,0.48,0.9)
+legend.AddEntry(effGraph,"Efficiency","lp")
+legend.AddEntry(purGraph,"Purity","lp")
+
+legend.Draw("SAME")
+canvas1.Write("EffVsPurity")
