@@ -35,6 +35,7 @@ protonRange=args.protonRange
 saveStripMaps=args.saveHits
 geoName=args.geo
 print args
+restrictNTracks=True
 
 if args.useHalfStrips>0:
         useHalfStrips=True
@@ -62,6 +63,8 @@ _EfficiencyErr,_PurityErr,_NumberOfProtonsErr=array('d'),array('d'),array('d')
 
 for nMeanProton in range(minProtons,minProtons+protonRange):
 
+        print "\nMean number of protons: ",nMeanProton
+        
         totalProtons=0.0
 
         nTracks=[]
@@ -82,7 +85,7 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
         #reset output file and setup histograms for loop
         MyFile =TFile("tracking.root","RECREATE");
         for i in range(NLoops):
-                if i%1 == 0:
+                if i%10 == 0:
                         print("Processing loop "+(str)(i)+" of "+(str)(NLoops))
 
                 #get nProtons according to possion distribution
@@ -91,6 +94,9 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
                 else:
                         nProton=nMeanProton
                 totalProtons+=nProton
+
+                if nProton==0:
+                        continue
                       
                 #get proton starting positions and angular distributions
                 XY=hf.GetRandomXY(nProton,size,width,posX,posY)
@@ -109,7 +115,7 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
                         #find overlap of strips and return hit objects of form (XCoord,YCoord,[stripX,stripU,stripV],[radial distance to intersections])
                         Hits=hf.FindOverlaps(Strips,pitch,TrackerAngles[module],stripTolerance,useHalfStrips)
                         #verify that hits are reconstructed within correct area
-                        Hits=hf.CheckInsideDetectorArea(Hits,pitch,size,TrackerAngles[module])
+                        #Hits=hf.CheckInsideDetectorArea(Hits,pitch,size,TrackerAngles[module])
                         #look for obvious cases of fake hits (adjacent to each other) and merge them by averaging x-y cooords
                         Hits=hf.MergeAdjacentHits(Hits,stripTolerance,pitch)
                         TrackerHits.append(Hits)
@@ -118,13 +124,13 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
                         #calculate efficiency for finding correct hits by checking there is always a reco hit within tolerance of true hit
                         eff=hf.GetEfficiency(Hits,meanXY,pitch,stripTolerance)
                         trackerEffs[module].append(100*eff)
+                        nFakeHits=len(Hits)- (nProton*eff)
 
                         #calculate ambiguity
-                        ambiguity[module].append(100*(float)(len(Hits)-nProton)/len(Hits))
-                        nFakeHits=len(Hits)- (nProton*eff)
+                        if len(Hits)>0:
+                                ambiguity[module].append(100*(float)(len(Hits)-nProton)/len(Hits))
+                                correctedAmbiguity[module].append(100*nFakeHits/len(Hits))
                         
-                        #correctedAmbiguity.append(100*((len(Hits)/eff)-nProton)/nProton)
-                        correctedAmbiguity[module].append(100*nFakeHits/len(Hits))
 
                         #if module==0:
                         #        print nTrackerHits[module][-1],trackerEffs[module][-1],ambiguity[module][-1],nFakeHits,correctedAmbiguity[module][-1]
@@ -134,7 +140,6 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
 
                 #reconstruct tracks
                 MaxNTracks=max(MaxNStrips)
-                restrictNTracks=False
                 if len(TrackerAngles)>1:
                         RecoTracks=hf.ReconstructTracks(TrackerHits,trackTolerance,pitch,MaxNTracks,restrictNTracks)
                         hf.WriteTracks(outfilename,RecoTracks,ZMeans,i)
@@ -148,9 +153,10 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
                 trackEfficiency.append(100*eff)
 
                 #calculate track ambiguity rate
-                trackAmbiguity.append(100*(len(RecoTracks)-nProton)/len(RecoTracks))
                 nFakeTracks=len(RecoTracks)-(nProton*eff)
-                correctedTrackAmbiguity.append(100*nFakeTracks/len(RecoTracks))
+                if len(RecoTracks)>0:
+                        trackAmbiguity.append(100*(len(RecoTracks)-nProton)/len(RecoTracks))
+                        correctedTrackAmbiguity.append(100*nFakeTracks/len(RecoTracks))
                 
                 if saveStripMaps and len(TrackerAngles)>1:
                         hf.DrawTrackMap("TrackMap",RecoTracks,XY,xmax)
@@ -188,7 +194,7 @@ purGraph.SetMarkerSize(2)
 purGraph.GetXaxis().SetTitle("Mean N Proton")
 purGraph.GetYaxis().SetTitle("Purity")
 purGraph.SetTitle("Purity")
-MyFile =TFile("effVsPurity.root","RECREATE");
+MyFile =TFile("effVsPurity_bs"+(str)(beamSpread)+"mrad_geo"+geoName+"_RestrictTracks"+(str)(restrictNTracks)+".root","RECREATE");
 
 mg=TMultiGraph()
 mg.SetTitle("Efficiency and Purity vs nProtons;Mean N Protons; (%)")

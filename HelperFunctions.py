@@ -22,12 +22,15 @@ def GetDirections(nProtons,beamSpread,cheat):
         mXmY=[]
         # m = tan(theta)
         for x in range(nProtons):
-                mX=math.tan(random.uniform(-beamSpread/1000.0,beamSpread/1000.0))
-                mY=math.tan(random.uniform(-beamSpread/1000.0,beamSpread/1000.0))
+                #mX=math.tan(random.uniform(-beamSpread/1000.0,beamSpread/1000.0))
+                #mY=math.tan(random.uniform(-beamSpread/1000.0,beamSpread/1000.0))
+                mX=math.tan(random.gauss(0.0,beamSpread/1000.0))
+                mY=math.tan(random.gauss(0.0,beamSpread/1000.0))
                 if cheat==False:
                         mXmY.append([mX,mY])
                 else:
                         mXmY.append([0,0])
+        #print mXmY
         return mXmY
 
 def ConvertXYToStrip(coord,pitch,rawAngle):
@@ -1004,3 +1007,47 @@ def CheckInsideDetectorArea(Hits,pitch,size,angles):
                         print Strips
 
         return acceptedHits
+
+def GenerateMSAngle(ebeam=200):
+
+        #ebeam = kinetic energy in MeV
+        
+        m=938.272 #MeV
+        E=ebeam+m #K.E. plus rest mass
+        p=math.sqrt(E**2 -m**2)
+        print "p=",p
+        v=p/E
+        vp=v*p
+        print "beta*momentum= ",vp
+        
+        #silicon
+        #x=155 #um
+        #X0=9.37*10000 #radiation length, convert from cm to um
+
+        #water
+        x=30.00*10000 #um
+        X0=36.08*10000 #radiation length, convert from cm to um
+
+        distance=math.sqrt(x/X0)
+        #distance=math.sqrt(0.6)
+        print "x/X0=",distance**2
+        
+        #pdg- theta0 is the sigma for gaussian distribution of the angles
+        theta0=1000*(13.6/vp)*distance*(1+0.038*math.log(distance)) 
+        
+        #hanson approximation- from Harvard notes
+        theta0Alt=1000*(14.1/vp)*distance*(1+(1.0/9.0)*math.log(distance,10)) 
+
+        print "Theta0=",theta0,"mrad"
+        print "ThetaAlt=",theta0Alt,"mrad"
+
+        #pdg seems to underestimate scattering- potentially not including strong interactions
+
+        #a1=random.gauss(0.0,1.0)
+        #a2=random.gauss(0.0,1.0)
+
+        #from pdg for MS, way to generate correlated angular and spacial shifts
+        #radialShift=a1*x*theta0Alt/math.sqrt(12.0) + a2*x*theta0Alt/2.0
+        #thetashift=a2*theta0Alt
+
+

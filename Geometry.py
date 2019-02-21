@@ -10,7 +10,8 @@ hf.SetSeed(2022)
 
 #stripTolerance=1.5 #4 planes per module...for some reason- shape varies depending on position
 
-beamSpread=2.0 #mrad
+beamSpread=3.0 #mrad
+sigma=2.0 #number of standard deviations of beamspread to try and accept
 
 size=20 #cm
 
@@ -19,7 +20,7 @@ interPlaneDistance=12.0*1000 #um
 interModuleDistance=100.0*1000 #um
 phantomGap=80.0*1000 #um
 
-geometryNames=["1ModuleXY","1ModuleXUV","2ModuleXY","2ModuleXUV","4ModuleXY","4ModuleXUV"]
+geometryNames=["1ModuleXY","1ModuleXUV","2ModuleXY","2ModuleXUV","4ModuleXY","4ModuleXUV","2ModuleXUV_RT"]
 
 
 def init(geoname):
@@ -53,30 +54,34 @@ def init(geoname):
         elif geoname=="2ModuleXY":
 
                 #stripTolerance=math.sqrt(2.0)/2.0
-                stripTolerance=0.9 #needs to be slightly higher than expected due to separation between planes
+                #stripTolerance=0.9 #needs to be slightly higher than expected due to separation between planes
+                pixelsize=math.sqrt(2.0)/2.0 #distance from centre of pixel to corner
+
+                stripTolerance=2*math.tan(sigma*beamSpread/1000.0)*interPlaneDistance/pitch + pixelsize # separation of planes+ base strip tolerance
 
                 #add error from strip tolerance + deviation from parallel beams
-                trackTolerance=2*math.tan(beamSpread/1000.0)*interModuleDistance + stripTolerance*pitch
+                trackTolerance=2*math.tan(sigma*beamSpread/1000.0)*interModuleDistance + stripTolerance*pitch
 
                 pos=0
 
                 TrackerAngles.append([0,90])
                 TrackerZ.append([pos,pos+interPlaneDistance])
-                #TrackerZ.append([0,0])
                 
                 pos+=interModuleDistance+interPlaneDistance
         
                 TrackerAngles.append([45,135])
                 TrackerZ.append([pos,pos+interPlaneDistance])
-                #TrackerZ.append([0,0])
                 
 
         elif  geoname=="2ModuleXUV":
 
-                stripTolerance=1.0
+                
+                pixelsize=0.7 #distance from centre of pixel to corner
+                
+                stripTolerance=2*math.tan(sigma*beamSpread/1000.0)*interPlaneDistance/pitch + pixelsize
 
                 #add error from strip tolerance + deviation from parallel beams
-                trackTolerance=2*math.tan(beamSpread/1000.0)*interModuleDistance + stripTolerance*pitch
+                trackTolerance=2*math.tan(sigma*beamSpread/1000.0)*interModuleDistance + stripTolerance*pitch
 
                 pos=0
 
@@ -88,6 +93,27 @@ def init(geoname):
                 TrackerAngles.append([30,90,150])
                 TrackerZ.append([pos,pos+interPlaneDistance,pos+2*interPlaneDistance])
 
+        elif  geoname=="2ModuleXUV_RT":
+
+                
+                pixelsize=0.7 #distance from centre of pixel to corner
+                
+                stripTolerance=2*math.tan(sigma*beamSpread/1000.0)*interPlaneDistance/pitch + pixelsize
+
+                #add error from strip tolerance + deviation from parallel beams
+                trackTolerance=2*math.tan(sigma*beamSpread/1000.0)*interModuleDistance + stripTolerance*pitch
+
+                pos=0
+
+                TrackerAngles.append([0,60,120])
+                TrackerZ.append([pos,pos+interPlaneDistance,pos+2*interPlaneDistance])
+
+                pos+=interModuleDistance+2*interPlaneDistance
+                
+                TrackerAngles.append([30,90,150])
+                TrackerZ.append([pos,pos+interPlaneDistance,pos+2*interPlaneDistance])
+
+                
         elif geoname=="4ModuleXY":
 
                 #stripTolerance=math.sqrt(2.0)/2.0
