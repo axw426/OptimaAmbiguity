@@ -10,15 +10,16 @@ hf.SetSeed(2022)
 
 #stripTolerance=1.5 #4 planes per module...for some reason- shape varies depending on position
 
-beamSpread=3.0 #mrad
+beamSpread=35.0 #mrad
 sigma=2.0 #number of standard deviations of beamspread to try and accept
 
 size=20 #cm
 
 sensorThickness=155.0 #um
-interPlaneDistance=12.0*1000 #um
-interModuleDistance=100.0*1000 #um
-phantomGap=80.0*1000 #um
+interPlaneDistance=12.0*1000 #mm to um
+interModuleDistance=100.0*1000 #mm to um
+phantomGap=80.0*1000 #mm to um
+RTDistance=interModuleDistance
 
 geometryNames=["1ModuleXY","1ModuleXUV","2ModuleXY","2ModuleXUV","4ModuleXY","4ModuleXUV","2ModuleXUV_RT"]
 
@@ -68,8 +69,9 @@ def init(geoname):
                 TrackerZ.append([pos,pos+interPlaneDistance])
                 
                 pos+=interModuleDistance+interPlaneDistance
-        
-                TrackerAngles.append([45,135])
+
+                relativeAngle=45.0
+                TrackerAngles.append([0,90])
                 TrackerZ.append([pos,pos+interPlaneDistance])
                 
 
@@ -89,8 +91,9 @@ def init(geoname):
                 TrackerZ.append([pos,pos+interPlaneDistance,pos+2*interPlaneDistance])
 
                 pos+=interModuleDistance+2*interPlaneDistance
-                
-                TrackerAngles.append([30,90,150])
+
+                relativeAngle=30.0
+                TrackerAngles.append([0+relativeAngle,60+relativeAngle,120+relativeAngle])
                 TrackerZ.append([pos,pos+interPlaneDistance,pos+2*interPlaneDistance])
 
         elif  geoname=="2ModuleXUV_RT":
@@ -100,9 +103,8 @@ def init(geoname):
                 
                 stripTolerance=2*math.tan(sigma*beamSpread/1000.0)*interPlaneDistance/pitch + pixelsize
 
-                #add error from strip tolerance + deviation from parallel beams
-                trackTolerance=2*math.tan(sigma*beamSpread/1000.0)*interModuleDistance + stripTolerance*pitch
-
+                trackTolerance=0.01 #to be thought about!! Is currently chi2 of x fit * chi2 of y fit... feels dodgy, need 2D fit?
+            
                 pos=0
 
                 TrackerAngles.append([0,60,120])
@@ -110,9 +112,16 @@ def init(geoname):
 
                 pos+=interModuleDistance+2*interPlaneDistance
                 
-                TrackerAngles.append([30,90,150])
+                relativeAngle=30.0
+                TrackerAngles.append([0+relativeAngle,60+relativeAngle,120+relativeAngle])
                 TrackerZ.append([pos,pos+interPlaneDistance,pos+2*interPlaneDistance])
 
+                pos+=RTDistance+2*interPlaneDistance
+                
+                TrackerAngles.append([0,90])
+                TrackerZ.append([pos,pos+interPlaneDistance])
+                #TrackerAngles.append([0,60,120])
+                #TrackerZ.append([pos,pos+interPlaneDistance,pos+2*interPlaneDistance])
                 
         elif geoname=="4ModuleXY":
 
