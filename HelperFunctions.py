@@ -1,9 +1,9 @@
 import random
 import math
-from ROOT import gROOT, TCanvas, TF1, TF2, TH2F, TFile, TLine, TH1F, TLegend,TGraph
+from ROOT import gROOT, TCanvas, TF1, TF2, TH2F, TFile, TLine, TH1F, TLegend,TGraph,TGraphErrors
 from array import array
 import copy
-
+import numpy as np
 def SetSeed(seed):
 	random.seed(seed)
 
@@ -704,20 +704,83 @@ def ReconstructTracks2Planes(Hits,tolerance,pitch):
 
         return RecoTracks
 
-def GetChi2LinearFit(hits):
+def GetChi2(hits,TrackerZ,stripTolerance,pitch):
 
-        n=len(hits)
-        X,Y=array('d'),array('d')
-        for i in range(n):
-                X.append(hits[i][0])
-                Y.append(hits[i][1])
+        _X,_Y,_Z=array('d'),array('d'),array('d')
+        _XErr,_YErr,_ZErr=array('d'),array('d'),array('d')
 
-        graph=TGraph(4,X,Y)
+        for hit,Z in zip(hits,TrackerZ):
 
-        graph.Fit("pol1","Q")
+                _X.append(hit[0])
+                _XErr.append(stripTolerance*pitch)
+                _Y.append(hit[1])
+                _YErr.append(stripTolerance*pitch)
+                _Z.append(np.mean(Z))
+                _ZErr.append(0.0)
 
-    
-        return graph.GetFunction("pol1").GetChisquare()/(float)(graph.GetFunction("pol1").GetNDF())
+        myfit=TF1("myfit","[0]+[1]*x")
+
+        graphX=TGraphErrors(len(_Z),_Z,_X,_ZErr,_XErr)
+        graphX.Fit("myfit","Q")
+        myfitX=graphX.GetFunction("myfit")
+        chi2X=myfitX.GetChisquare()
+        cX=myfitX.GetParameter(0)
+        mX=myfitX.GetParameter(1)
+        
+        graphY=TGraphErrors(len(_Z),_Z,_Y,_ZErr,_YErr)
+        graphY.Fit("myfit","Q")
+        myfitY=graphY.GetFunction("myfit")
+        chi2Y=myfitY.GetChisquare()
+        cY=myfitY.GetParameter(0)
+        mY=myfitY.GetParameter(1)
+        
+        del graphX,graphY
+
+        return chi2X*chi2Y,[[cX,mX],[cY,mY]]
+
+
+def ReconstructTracks3Planes(Hits,tolerance,pitch,TrackerZ,stripTolerance):
+
+        RecoTracks=[]
+        #print "Hits 0", len(Hits[0]), Hits[0]
+
+        while len(Hits[0])>0 and len(Hits[1])>0 and len(Hits[2])>0:
+                bestChi2=100000
+                bestIPos=-1
+                bestJPos=-1
+                bestKPos=-1
+                bestFitParameters=[]
+                for i in range(len(Hits[0])):
+                        for j in range(len(Hits[1])):
+                                for k in range(len(Hits[2])):
+                                        hitI=Hits[0][i]
+                                        hitJ=Hits[1][j]
+                                        hitK=Hits[2][k]
+                                        chi2,fitParameters=GetChi2([hitI,hitJ,hitK],TrackerZ,stripTolerance,pitch)
+                                        #print chi2, "aHit1:",hitI[0],hitI[1],"Hit2:",hitJ[0],hitJ[1],"Hit3:",hitK[0],hitK[1]
+                                        #print len(Hits[0]), Hits[0]
+                                        #print chi2
+                                        if chi2<bestChi2:
+                                                bestIPos=i
+                                                bestJPos=j
+                                                bestKPos=k
+                                                bestChi2=chi2
+                                                bestFitParameters=fitParameters
+                #print bestChi2, "Hit1:",Hits[0][bestIPos][0],Hits[0][bestIPos][1],"Hit2:",Hits[1][bestJPos][0],Hits[1][bestJPos][1],"Hit3:",Hits[2][bestKPos][0],Hits[2][bestKPos][1]
+                #print bestIPos,bestJPos,bestKPos
+                #print bestChi2, tolerance
+                if bestChi2<tolerance:
+                        #Append hit positions to track list
+                        RecoTracks.append([Hits[0][bestIPos],Hits[1][bestJPos],Hits[2][bestKPos]])
+                        #delete entries from Hits
+                        del Hits[0][bestIPos]
+                        del Hits[1][bestJPos]
+                        del Hits[2][bestKPos]
+                else:
+                        break
+
+        return RecoTracks
+
 
 def SumRadialSeparation(hits):
 
@@ -757,7 +820,6 @@ def ReconstructTracks4Planes(Hits,trackTolerance,pitch):
                                                 hitJ=Hits[1][j]
                                                 hitK=Hits[2][k]
                                                 hitL=Hits[3][l]
-                                                #chi2=GetChi2LinearFit([hitI,hitJ,hitK,hitL])
                                                 chi2=SumRadialSeparation([hitI,hitJ,hitK,hitL])
                                                 if chi2<bestChi2 and chi2>0.0001:
                                                         bestIPos=i
@@ -766,7 +828,7 @@ def ReconstructTracks4Planes(Hits,trackTolerance,pitch):
                                                         bestLPos=l
                                                         bestChi2=chi2
 
-                if bestChi2<trackTolerance : #NEED TO DECIDE SENSIBLE VALUE
+                if bestChi2<trackTolerance : 
                         #Append hit positions to track list
                         RecoTracks.append([Hits[0][bestIPos],Hits[1][bestJPos],Hits[2][bestKPos],Hits[3][bestLPos]])
                         #delete entries from Hits
@@ -780,10 +842,12 @@ def ReconstructTracks4Planes(Hits,trackTolerance,pitch):
 
         return RecoTracks
 
-def ReconstructTracks(Hits,trackTolerance,pitch,MaxNTracks,restrictNTracks ):
+def ReconstructTracks(Hits,trackTolerance,pitch,MaxNTracks,restrictNTracks,TrackerZ,stripTolerance ):
 
         if len(Hits)==2:
-                AllTracks=ReconstructTracks2Planes(Hits,trackTolerance,pitch)   
+                AllTracks=ReconstructTracks2Planes(Hits,trackTolerance,pitch)
+        elif len(Hits)==3:
+                AllTracks=ReconstructTracks3Planes(Hits,trackTolerance,pitch,TrackerZ,stripTolerance) 
         elif len(Hits)==4:
                 AllTracks=ReconstructTracks4Planes(Hits,trackTolerance,pitch)
         else:
@@ -870,6 +934,7 @@ def GetTrackSeparation(trueTrack,recoTrack,effTolerance):
         for trueHit,recoHit in zip(trueTrack,recoTrack):
                 #for every point on track check if the true and reconstructed hits agree
                 separation=math.sqrt((trueHit[0]-recoHit[0])**2 + (trueHit[1]-recoHit[1])**2)
+                #print "separation=",separation
                 if separation>effTolerance:
                         #print separation
                         passed=False
@@ -888,20 +953,27 @@ def GetTrackEfficiency(effTolerance,XY,mXmY,RecoTracks,TrackerZ,pitch):
                 TrackerPositions.append(sum(z)/len(z))
 
         nTrueFound=0.0
-                
+        
         #loop over all true protons
         for coord,direction in zip(XY,mXmY):
                 #create a track for the true proton 
                 trueTrack=[]
+                passed=False
                 for position in TrackerPositions:
                         trueTrack.append([coord[0]+direction[0]*position,coord[1]+direction[1]*position])
                 #loop over reco tracks and see if any match within a tolerance
                 for recoTrack in RecoTracks:
                         if GetTrackSeparation(trueTrack,recoTrack,effTolerance):
                                 nTrueFound+=1.0
+                                passed=True
                                 break
 
+                #if passed==False:
+                #        print "missed track positions=",trueTrack
+    
+
         return nTrueFound/(float)(len(XY))
+
 
 def WriteTracks(outfilename,RecoTracks,ZMeans,loop):
 
