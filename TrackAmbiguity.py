@@ -35,7 +35,7 @@ protonRange=args.protonRange
 saveStripMaps=args.saveHits
 geoName=args.geo
 print args
-restrictNTracks=True
+restrictNTracks=False
 
 if args.useHalfStrips>0:
         useHalfStrips=True
@@ -43,11 +43,11 @@ else:
         useHalfStrips=False
 
 TrackerAngles,TrackerZ,ZMeans,stripTolerance,trackTolerance,pitch,beamSpread,size=geo.init(geoName)
+#print ZMeans
 #print "Using geometry"+geoName,TrackerAngles,TrackerZ,stripTolerance,trackTolerance,pitch,beamSpread,size
 xmax=size*5000
 
-#Strip tolerance: arises from spacial separation of XU, XV, and UV overlaps, irrelevant for two strip configuration as only one point of intersection
-#Efficiency tolerance: accounts for difference between reconstructed and true hit positions- essentially combination of hit efficiency and ambiguity in association of hits to form tracks
+#Strip tolerance: arises from spacial separation of XU, XV, and UV overlaps, irrelevant for two strip configuration as only one point of intersection, used for efficiency definition
 #Track tolerance: currently defines a quality cut for the track reconstruction based on total deviation from parallel beams
 
 #gStyle.SetOptStat(0000)
@@ -63,7 +63,7 @@ _EfficiencyErr,_PurityErr,_NumberOfProtonsErr=array('d'),array('d'),array('d')
 
 for nMeanProton in range(minProtons,minProtons+protonRange):
 
-        print "\nMean number of protons: ",nMeanProton
+        #print "\nMean number of protons: ",nMeanProton
         
         totalProtons=0.0
 
@@ -81,11 +81,13 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
                 trackerEffs.append([])
                 ambiguity.append([])
                 correctedAmbiguity.append([])
-        
+
+
+                
         #reset output file and setup histograms for loop
         MyFile =TFile("tracking.root","RECREATE");
         for i in range(NLoops):
-                if i%10 == 0:
+                if i%1 == 0:
                         print("Processing loop "+(str)(i)+" of "+(str)(NLoops))
 
                 #get nProtons according to possion distribution
@@ -99,6 +101,7 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
                         continue
                       
                 #get proton starting positions and angular distributions
+                #print "Building proton paths",nProton
                 XY=hf.GetRandomXY(nProton,size,width,posX,posY)
                 mXmY=hf.GetDirections(nProton,beamSpread,False)
 
@@ -106,9 +109,12 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
                 TrackerHits=[]
                 MaxNStrips=[]
                 for module in range(len(TrackerAngles)):
-                                       
+
+                        #print "Processing module",module
+
                         #convert simulated protons to strips 
                         Strips,meanXY=hf.GetTrackerStripCoOrds(XY,mXmY,pitch,TrackerAngles[module],TrackerZ[module])
+                       # print "meanXY=",meanXY
                         #keep track of maximum number of strips in each module
                         MaxNStrips.append(len(max(Strips,key=len)))                        
 
@@ -117,15 +123,16 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
                         #verify that hits are reconstructed within correct area
                         #Hits=hf.CheckInsideDetectorArea(Hits,pitch,size,TrackerAngles[module])
                         #look for obvious cases of fake hits (adjacent to each other) and merge them by averaging x-y cooords
-                        Hits=hf.MergeAdjacentHits(Hits,stripTolerance,pitch)
+                        #Hits=hf.MergeAdjacentHits(Hits,stripTolerance,pitch)
                         TrackerHits.append(Hits)
                         nTrackerHits[module].append(len(Hits))
-
+                        #print nTrackerHits[module][-1]
+                        
                         #calculate efficiency for finding correct hits by checking there is always a reco hit within tolerance of true hit
                         eff=hf.GetEfficiency(Hits,meanXY,pitch,stripTolerance)
                         trackerEffs[module].append(100*eff)
                         nFakeHits=len(Hits)- (nProton*eff)
-
+                        
                         #calculate ambiguity
                         if len(Hits)>0:
                                 ambiguity[module].append(100*(float)(len(Hits)-nProton)/len(Hits))
@@ -139,16 +146,24 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
                                 hf.PlotHitMap("Tracker"+(str)(module)+"Hits",TrackerHits[module],XY,Strips,pitch,size,i,TrackerAngles[module])
 
                 #reconstruct tracks
+                #print "Building tracks"
+
                 MaxNTracks=max(MaxNStrips)
                 if len(TrackerAngles)>1:
-                        RecoTracks=hf.ReconstructTracks(TrackerHits,trackTolerance,pitch,MaxNTracks,restrictNTracks)
-                        hf.WriteTracks(outfilename,RecoTracks,ZMeans,i)
+                        RecoTracks=hf.ReconstructTracks(TrackerHits,trackTolerance,pitch,MaxNTracks,restrictNTracks,TrackerZ,stripTolerance)
+                       # hf.WriteTracks(outfilename,RecoTracks,ZMeans,i)
                 else:
                         RecoTracks=TrackerHits[0]
                      
                 nTracks.append(len(RecoTracks))
 
+                #print RecoTracks
+                #for hit in RecoTracks[0]:
+                #        print hit[3]
+                
                 #get track efficiency
+                #print "Calculate efficiency",len(RecoTracks)
+
                 eff=hf.GetTrackEfficiency(stripTolerance*pitch,XY,mXmY,RecoTracks,TrackerZ,pitch)
                 trackEfficiency.append(100*eff)
 
@@ -194,7 +209,7 @@ purGraph.SetMarkerSize(2)
 purGraph.GetXaxis().SetTitle("Mean N Proton")
 purGraph.GetYaxis().SetTitle("Purity")
 purGraph.SetTitle("Purity")
-MyFile =TFile("effVsPurity_bs"+(str)(beamSpread)+"mrad_geo"+geoName+"_RestrictTracks"+(str)(restrictNTracks)+".root","RECREATE");
+MyFile =TFile("effVsPurity_bs"+(str)(beamSpread)+"mrad_geo"+geoName+"_RestrictTracks"+(str)(restrictNTracks)+"_pitch"+(str)(pitch)+".root","RECREATE");
 
 mg=TMultiGraph()
 mg.SetTitle("Efficiency and Purity vs nProtons;Mean N Protons; (%)")
