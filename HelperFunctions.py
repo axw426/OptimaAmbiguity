@@ -30,17 +30,9 @@ def GetDirections(nProtons,beamSpread,cheat):
                         mXmY.append([mX,mY])
                 else:
                         mXmY.append([0,0])
-        #print mXmY
         return mXmY
 
 def ConvertXYToStrip(coord,pitch,rawAngle):
-
-        #rotate xy by appropriate angle, divide by pitch to get strip number, means strip zero is centred on x=pitch/2.0
-        #return (int)(( coord[0]*math.cos(math.radians(rawAngle)) - coord[1]*math.sin(math.radians(rawAngle))) /pitch)
-
-        #OR rotate by angle, + pitch/2.0 , divide by pitch: strip zero now centred on 0.0 
-        #return (int)(((coord[0]-(pitch/2.0))*math.cos(math.radians(rawAngle)) - (coord[1]-(pitch/2.0))*math.sin(math.radians(rawAngle))) /pitch)
-        # return (int)(((coord[0])*math.cos(math.radians(rawAngle)) - (coord[1])*math.sin(math.radians(rawAngle))+pitch/2.0) /pitch)
 
         rotatedX= coord[0]*math.cos(math.radians(rawAngle)) - coord[1]*math.sin(math.radians(rawAngle))
         if rotatedX >=0.5:
@@ -50,12 +42,10 @@ def ConvertXYToStrip(coord,pitch,rawAngle):
         else:
                 Strip=0
 
-       # print coord, rawAngle, Strip
         return Strip
 def CheckStripHalf(coord,pitch,rawAngle):
 
         #assuming centre of sensor is at y=0.0,x=0.0
-        #y= (int)(((coord[0]-(pitch/2.0))*math.sin(math.radians(rawAngle)) + (coord[1]-(pitch/2.0))*math.cos(math.radians(rawAngle)))/pitch)
         y= (int)((coord[0]*math.sin(math.radians(rawAngle)) + coord[1]*math.cos(math.radians(rawAngle))) /pitch)
 
         return y
@@ -72,7 +62,6 @@ def GetTrackerStripCoOrds(XY,mXmY,pitch,angles,Z):
         
         for coord,direction in zip(XY,mXmY):
                 #updated pos=X0+mX*Z
-                #print(angles[0],angles[1])
                 coordX=[coord[0]+direction[0]*Z[0],coord[1]+direction[1]*Z[0]]
                 StripX.append(ConvertXYToStrip(coordX,pitch,angles[0]))
                 StripHalfX.append(CheckStripHalf(coordX,pitch,angles[0]))
@@ -148,7 +137,7 @@ def GetPixelCoOrds(XY,pitch):
 
 
 def FindMandC(U,theta,pitch):
-     	xPrime=(U*pitch)#+pitch/2.0
+     	xPrime=(U*pitch)
 	
 	m=-1*math.tan(math.radians(90-theta))
 	c=xPrime/math.cos(math.radians(90-theta))
@@ -164,8 +153,6 @@ def FindIntersect(X,U,theta,pitch):
 	m,c=FindMandC(U,-theta,pitch)
 	y=(m*x)+c
 
-        #print("M=",m,"c=",c,"x=",x,"X'=",xPrime,"y=",y)
-	
 	return [x,y]
 	
 def FindUVIntersect(U,V,uAngle,vAngle,pitch):
@@ -179,27 +166,22 @@ def FindUVIntersect(U,V,uAngle,vAngle,pitch):
         #define y=mx+c for U and V in frame of X layer
 
         m1,c1=FindMandC(U,-uAngle,pitch)
-	#print(m1,c1)
         m2,c2=FindMandC(V,-vAngle,pitch)
-	#print(m2,c2)
 
 	Xintercept=(c2-c1)/(m1-m2)
 	Yintercept1=(m1*Xintercept) + c1
 	Yintercept2=(m2*Xintercept) + c2
-	#print("XIntercept=",Xintercept,"YIntercept1=",Yintercept1,"YIntercept2=",Yintercept2)
+
 	return [Xintercept,Yintercept1]
 	
 
 def CheckProximity(xycoords,tolerance,pitch):	
 
-        #print("XYCOORDS=",xycoords)
-        #print("Side length=",math.sqrt( (xycoords[0][1]-xycoords[1][1])**2  + (xycoords[0][0]-xycoords[1][0])**2))
-
         passed=True
 
         xmean=0.0
 	ymean=0.0
-        #print(len(xycoords))
+
         for i in range(len(xycoords)):
                 xmean+=xycoords[i][0]
                 ymean+=xycoords[i][1]
@@ -211,7 +193,6 @@ def CheckProximity(xycoords,tolerance,pitch):
                 r= math.sqrt( (xycoords[i][1]-ymean)**2  + (xycoords[i][0]-xmean)**2)
                 rValues.append(r)
                 if r>=tolerance*pitch:
-                        #print("r=",r)
                         passed=False
 
         return passed,xmean,ymean,rValues
@@ -451,9 +432,7 @@ def PlotHitMap(name,allHits,XY,Strips,pitch,size,loop,angles):
         #draw the strips which were hit
         nPlanes=len(angles)
 
-        #if nPlanes==2:
-
-        
+       
         if nPlanes==3:
                 for X,U,V in zip(Strips[0],Strips[1],Strips[2]):
 
@@ -539,11 +518,6 @@ def RemoveAdjacentHits(allHits,tolerance,pitch):
                 if passed==True:
                         refinedHits.append(i)
 
-        #for i in allHits:
-        #        print i
-        #print ""
-        #for i in refinedHits:
-        #        print i
         return refinedHits
 
 
@@ -647,6 +621,7 @@ def RemoveAmbiguities(inHits,rawAngle,pitch):
                 for hitB in inHits:
                         if hitA[2][0]==hitB[2][0] and GetPixelArea(hitA,rawAngle,pitch)>GetPixelArea(hitB,rawAngle,pitch):
                                 passed=False
+                                break
                 if passed==True:
                         XAcceptedHits.append(hitA)
 
@@ -656,6 +631,7 @@ def RemoveAmbiguities(inHits,rawAngle,pitch):
                 for hitB in XAcceptedHits:
                         if hitA[2][1]==hitB[2][1] and GetPixelArea(hitA,rawAngle,pitch)>GetPixelArea(hitB,rawAngle,pitch):
                                 passed=False
+                                break
                 if passed==True:
                        XUAcceptedHits.append(hitA)           
 
@@ -665,22 +641,18 @@ def RemoveAmbiguities(inHits,rawAngle,pitch):
                 for hitB in XUAcceptedHits:
                         if hitA[2][2]==hitB[2][2] and GetPixelArea(hitA,rawAngle,pitch)>GetPixelArea(hitB,rawAngle,pitch):
                                 passed=False
+                                break
                 if passed==True:
                        XUVAcceptedHits.append(hitA)  
 
         return XUVAcceptedHits
 
-def FindRadius(i,j):
-
-        return math.sqrt((i[0]-j[0])**2 + (i[1]-j[1])**2)
-
 
 def ReconstructTracks2Planes(Hits,tolerance,pitch):
 
         RecoTracks=[]
-        
+        #loop over all hits pairs and find pair with minimum separation, add as track and remove hits from hit database
         while len(Hits[0])>0 and len(Hits[1])>0:
-                #print("Lenghts=",len(Hits[0]),len(Hits[1]))
                 minimumSeparation=100000
                 bestIPos=-1
                 bestJPos=-1
@@ -688,7 +660,7 @@ def ReconstructTracks2Planes(Hits,tolerance,pitch):
                         for j in range(len(Hits[1])):
                                 hitI=Hits[0][i]
                                 hitJ=Hits[1][j]
-                                r=FindRadius(hitI,hitJ)
+                                r=GetSeparation(hitI,hitJ)
                                 if r<minimumSeparation:
                                         bestIPos=i
                                         bestJPos=j
@@ -706,6 +678,8 @@ def ReconstructTracks2Planes(Hits,tolerance,pitch):
 
 def GetChi2(hits,TrackerZ,stripTolerance,pitch):
 
+        #does a chi2 to check trajectory across 3 hits is linear in both x and y, should probably be a simultaneous fit
+        
         _X,_Y,_Z=array('d'),array('d'),array('d')
         _XErr,_YErr,_ZErr=array('d'),array('d'),array('d')
 
@@ -742,7 +716,6 @@ def GetChi2(hits,TrackerZ,stripTolerance,pitch):
 def ReconstructTracks3Planes(Hits,tolerance,pitch,TrackerZ,stripTolerance):
 
         RecoTracks=[]
-        #print "Hits 0", len(Hits[0]), Hits[0]
 
         while len(Hits[0])>0 and len(Hits[1])>0 and len(Hits[2])>0:
                 bestChi2=100000
@@ -757,18 +730,12 @@ def ReconstructTracks3Planes(Hits,tolerance,pitch,TrackerZ,stripTolerance):
                                         hitJ=Hits[1][j]
                                         hitK=Hits[2][k]
                                         chi2,fitParameters=GetChi2([hitI,hitJ,hitK],TrackerZ,stripTolerance,pitch)
-                                        #print chi2, "aHit1:",hitI[0],hitI[1],"Hit2:",hitJ[0],hitJ[1],"Hit3:",hitK[0],hitK[1]
-                                        #print len(Hits[0]), Hits[0]
-                                        #print chi2
                                         if chi2<bestChi2:
                                                 bestIPos=i
                                                 bestJPos=j
                                                 bestKPos=k
                                                 bestChi2=chi2
                                                 bestFitParameters=fitParameters
-                #print bestChi2, "Hit1:",Hits[0][bestIPos][0],Hits[0][bestIPos][1],"Hit2:",Hits[1][bestJPos][0],Hits[1][bestJPos][1],"Hit3:",Hits[2][bestKPos][0],Hits[2][bestKPos][1]
-                #print bestIPos,bestJPos,bestKPos
-                #print bestChi2, tolerance
                 if bestChi2<tolerance:
                         #Append hit positions to track list
                         RecoTracks.append([Hits[0][bestIPos],Hits[1][bestJPos],Hits[2][bestKPos]])
@@ -781,7 +748,54 @@ def ReconstructTracks3Planes(Hits,tolerance,pitch,TrackerZ,stripTolerance):
 
         return RecoTracks
 
+def CheckProjection(i,j,ZSeparation,stripTolerance,pitch, beamSpread):
+        sigma=2
+        maxSeparation=2*math.tan(sigma*beamSpread/1000.0)*ZSeparation + stripTolerance*pitch
+        separation=GetSeparation(i,j)
+        print separation,maxSeparation
+        if separation<maxSeparation:
+                return True
+        else:
+                return False
+def SegmentSorter(hits):
+        return GetSeparation(hits[0],hits[1])
+        
+def AltReconstructTracks(Hits,tolerance,pitch,TrackerZ,stripTolerance,beamSpread):
 
+        #loosely based on more traditional approaches, though not much can be done with 3 points....
+
+        #procedure:
+        #1) Start with most precise points (first XUV) as seeds
+        #2) Use uncertainty in position + expected MS angles to match to hits in second module i.e. check difference in radius ~ module separation*tanTheta + 2*stripTolerance 
+        #3) Use vector from first two hits to project to RT and match hits in acceptable area 
+        #4) Filter tracks somehow- merge similar tracks, 
+
+        ####### MAYBE TRY SWAPPING I AND J: SHOULD HAVE LOWEST AMBIGUITY IN SECOND MODULE AS TRACKS HAVE SPREAD OUT MORE?? #########
+        print "lenghts=",len(Hits[0]),len(Hits[1])
+        tracks=[]
+        for i in Hits[0]:
+                segments=[]
+                ZSeparation=np.mean(TrackerZ[1])-np.mean(TrackerZ[0])
+                for j in Hits[1]:
+                        if CheckProjection(i,j,ZSeparation,stripTolerance,pitch,beamSpread):
+                                segments.append([i,j])
+                                tracks.append([i,j])
+                #if len(segments)>0:
+                #        segments.sort(key=SegmentSorter)
+                #        tracks.append(segments[0])
+
+                #ZSeparation=TrackerZ[2]-TrackerZ[1]
+                #for segment in segments:
+                #        for k in Hits[k]:
+                #                if CheckRT(segment,k,ZSeparation,stripTolerance,pitch):
+                 #                       tracks.append([i,j,k])
+
+                #filter tracks by chi2 if more than one found
+
+        #filter tracks by proximity to each other to check 
+                
+        return tracks
+                       
 def SumRadialSeparation(hits):
 
         rSum=0.0
@@ -837,12 +851,11 @@ def ReconstructTracks4Planes(Hits,trackTolerance,pitch):
                         del Hits[2][bestKPos]
                         del Hits[3][bestLPos]
                 else:
-                       # print("Best Chi2=",bestChi2)
                         break
 
         return RecoTracks
 
-def ReconstructTracks(Hits,trackTolerance,pitch,MaxNTracks,restrictNTracks,TrackerZ,stripTolerance ):
+def ReconstructTracks(Hits,trackTolerance,pitch,MaxNTracks,restrictNTracks,TrackerZ,stripTolerance,beamSpread ):
 
         if len(Hits)==2:
                 AllTracks=ReconstructTracks2Planes(Hits,trackTolerance,pitch)
@@ -853,11 +866,10 @@ def ReconstructTracks(Hits,trackTolerance,pitch,MaxNTracks,restrictNTracks,Track
         else:
                 print("Can only cope with 2 or 4 tracker modules!")
                 quit()
-                
+
+        # can cut on expected number of tracks based on number of strips fired
         if restrictNTracks and len(AllTracks)>MaxNTracks:
-                #print("Found an excess of tracks, NTracks=",len(AllTracks),"Max allowed=",MaxNTracks)
                 SelectedTracks=AllTracks[0:MaxNTracks]
-                #print("New selected tracks length=",len(SelectedTracks))
         else:
                 SelectedTracks=AllTracks
                 
@@ -917,16 +929,6 @@ def DrawTrackMap(name,Tracks,XY,xmax):
 
         
 
-
-#def GetTrackSeparation(trueTrack,recoTrack):
-#
-#        separation=0.0
-#        
-#        for trueHit,recoHit in zip(trueTrack,recoTrack):
-#                separation +=math.sqrt((trueHit[0]-recoHit[0])**2 + (trueHit[1]-recoHit[1])**2)
-#        #print separation
-#        return separation
-
 def GetTrackSeparation(trueTrack,recoTrack,effTolerance):
 
         passed=True
@@ -934,9 +936,7 @@ def GetTrackSeparation(trueTrack,recoTrack,effTolerance):
         for trueHit,recoHit in zip(trueTrack,recoTrack):
                 #for every point on track check if the true and reconstructed hits agree
                 separation=math.sqrt((trueHit[0]-recoHit[0])**2 + (trueHit[1]-recoHit[1])**2)
-                #print "separation=",separation
                 if separation>effTolerance:
-                        #print separation
                         passed=False
                         break
         return passed
@@ -961,7 +961,7 @@ def GetTrackEfficiency(effTolerance,XY,mXmY,RecoTracks,TrackerZ,pitch):
                 passed=False
                 for position in TrackerPositions:
                         trueTrack.append([coord[0]+direction[0]*position,coord[1]+direction[1]*position])
-                #loop over reco tracks and see if any match within a tolerance
+                #loop over reco tracks and see if any match at each module within hit tolerance
                 for recoTrack in RecoTracks:
                         if GetTrackSeparation(trueTrack,recoTrack,effTolerance):
                                 nTrueFound+=1.0
@@ -1003,9 +1003,6 @@ def ReadJohnFile(inFile):
 
 
         with open(inFile,'r') as f:
-                #line=f.readline()#first line is empty...
-                #line=f.readline()#second line isn't real data...
-                #line=f.readline()#third line isn't real data...
                 line=f.readline()
                 while line:
                         values=line.split()
@@ -1108,18 +1105,17 @@ def GenerateMSAngle(ebeam=200):
         theta0=1000*(13.6/vp)*distance*(1+0.038*math.log(distance)) 
         
         #hanson approximation- from Harvard notes
-        theta0Alt=1000*(14.1/vp)*distance*(1+(1.0/9.0)*math.log(distance,10)) 
+        #theta0Alt=1000*(14.1/vp)*distance*(1+(1.0/9.0)*math.log(distance,10)) 
 
         print "Theta0=",theta0,"mrad"
-        print "ThetaAlt=",theta0Alt,"mrad"
 
-        #pdg seems to underestimate scattering- potentially not including strong interactions
+        #pdg seems to underestimate scattering relative to hanson? Potentially not including strong interactions
 
-        #a1=random.gauss(0.0,1.0)
-        #a2=random.gauss(0.0,1.0)
+        a1=random.gauss(0.0,1.0)
+        a2=random.gauss(0.0,1.0)
 
         #from pdg for MS, way to generate correlated angular and spacial shifts
-        #radialShift=a1*x*theta0Alt/math.sqrt(12.0) + a2*x*theta0Alt/2.0
-        #thetashift=a2*theta0Alt
+        radialShift=a1*x*theta0Alt/math.sqrt(12.0) + a2*x*theta0Alt/2.0
+        thetashift=a2*theta0Alt
 
 
