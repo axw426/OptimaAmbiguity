@@ -104,6 +104,7 @@ def init(geoname):
                 stripTolerance=2*math.tan(sigma*beamSpread/1000.0)*interPlaneDistance/pitch + pixelsize
 
                 trackTolerance=0.01 #to be thought about!! Is currently chi2 of x fit * chi2 of y fit... feels dodgy, need 2D fit?
+                #trackTolerance=25 #to be thought about!! Is currently chi2 of x vs y fit. Hard to accurately specify uncertainty on points as angular dependent...
             
                 pos=0
 

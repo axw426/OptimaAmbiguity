@@ -26,6 +26,8 @@ def GetDirections(nProtons,beamSpread,cheat):
                 #mY=math.tan(random.uniform(-beamSpread/1000.0,beamSpread/1000.0))
                 mX=math.tan(random.gauss(0.0,beamSpread/1000.0))
                 mY=math.tan(random.gauss(0.0,beamSpread/1000.0))
+                #mX=math.tan(beamSpread/1000.0)
+                #mY=math.tan(beamSpread/1000.0)
                 if cheat==False:
                         mXmY.append([mX,mY])
                 else:
@@ -61,6 +63,7 @@ def GetTrackerStripCoOrds(XY,mXmY,pitch,angles,Z):
         StripHalfY=[]
         
         for coord,direction in zip(XY,mXmY):
+
                 #updated pos=X0+mX*Z
                 coordX=[coord[0]+direction[0]*Z[0],coord[1]+direction[1]*Z[0]]
                 StripX.append(ConvertXYToStrip(coordX,pitch,angles[0]))
@@ -678,8 +681,6 @@ def ReconstructTracks2Planes(Hits,tolerance,pitch):
 
 def GetChi2(hits,TrackerZ,stripTolerance,pitch):
 
-        #does a chi2 to check trajectory across 3 hits is linear in both x and y, should probably be a simultaneous fit
-        
         _X,_Y,_Z=array('d'),array('d'),array('d')
         _XErr,_YErr,_ZErr=array('d'),array('d'),array('d')
 
@@ -707,11 +708,52 @@ def GetChi2(hits,TrackerZ,stripTolerance,pitch):
         chi2Y=myfitY.GetChisquare()
         cY=myfitY.GetParameter(0)
         mY=myfitY.GetParameter(1)
-        
+
+        #graphX.Write()
+        #graphY.Write()
         del graphX,graphY
 
-        return chi2X*chi2Y,[[cX,mX],[cY,mY]]
+        #print chi2X,chi2Y
 
+        return chi2X*chi2Y
+
+
+def GetChi2_SingleFit(hits,TrackerZ,stripTolerance,pitch):
+
+        #does a chi2 to check trajectory across 3 hits is linear in both x and y, should probably be a simultaneous fit
+        #causes a memory leak in ROOT6??? Need to run in sl6 for now...
+
+        
+        _X,_Y=array('d'),array('d')
+        _XErr,_YErr=array('d'),array('d')
+
+        for hit in hits:
+
+                _X.append(hit[0])
+                _XErr.append(2*pitch) # 2*pitch seems to give sensible chi2--> really will depend on angle of track
+                _Y.append(hit[1])
+                _YErr.append(2*pitch)
+
+        #X and Y have shared Z and both are linear with Z so will be linear relative to each other
+        myfit=TF1("myfit","[0]+[1]*x")
+
+        #find reasonable starting parameters
+        startM=(_Y[1]-_Y[0])/(_X[1]-_X[0])
+        startC=_Y[0]-startM*_X[0]
+        myfit.SetParameters(startC,startM)
+        
+        graph=TGraphErrors(len(_Y),_X,_Y,_XErr,_YErr)
+        graph.Fit("myfit","Q")
+        myfitResult=graph.GetFunction("myfit")
+        chi2=myfitResult.GetChisquare()
+        
+        #graph.Write()
+        del graph
+
+        #print chi2, [[cX,mX],[cY,mY]]
+        return chi2
+
+hChi2=TH1F("hCHi2","Chi2 of fit",50,-0.5,49.5)
 
 def ReconstructTracks3Planes(Hits,tolerance,pitch,TrackerZ,stripTolerance):
 
@@ -722,20 +764,19 @@ def ReconstructTracks3Planes(Hits,tolerance,pitch,TrackerZ,stripTolerance):
                 bestIPos=-1
                 bestJPos=-1
                 bestKPos=-1
-                bestFitParameters=[]
                 for i in range(len(Hits[0])):
                         for j in range(len(Hits[1])):
                                 for k in range(len(Hits[2])):
                                         hitI=Hits[0][i]
                                         hitJ=Hits[1][j]
                                         hitK=Hits[2][k]
-                                        chi2,fitParameters=GetChi2([hitI,hitJ,hitK],TrackerZ,stripTolerance,pitch)
+                                        chi2=GetChi2([hitI,hitJ,hitK],TrackerZ,stripTolerance,pitch)
                                         if chi2<bestChi2:
                                                 bestIPos=i
                                                 bestJPos=j
                                                 bestKPos=k
                                                 bestChi2=chi2
-                                                bestFitParameters=fitParameters
+                hChi2.Fill(bestChi2)
                 if bestChi2<tolerance:
                         #Append hit positions to track list
                         RecoTracks.append([Hits[0][bestIPos],Hits[1][bestJPos],Hits[2][bestKPos]])
@@ -745,24 +786,27 @@ def ReconstructTracks3Planes(Hits,tolerance,pitch,TrackerZ,stripTolerance):
                         del Hits[2][bestKPos]
                 else:
                         break
-
+        hChi2.Write()
         return RecoTracks
 
-def CheckProjection(i,j,ZSeparation,stripTolerance,pitch, beamSpread):
+def CheckProjection(i,j,TrackerZ,stripTolerance,pitch, beamSpread):
+
+        ZSeparation=np.mean(TrackerZ[1])-np.mean(TrackerZ[0])
         sigma=2
         maxSeparation=2*math.tan(sigma*beamSpread/1000.0)*ZSeparation + stripTolerance*pitch
         separation=GetSeparation(i,j)
-        print separation,maxSeparation
         if separation<maxSeparation:
                 return True
         else:
                 return False
+
 def SegmentSorter(hits):
         return GetSeparation(hits[0],hits[1])
-        
+
+
 def AltReconstructTracks(Hits,tolerance,pitch,TrackerZ,stripTolerance,beamSpread):
 
-        #loosely based on more traditional approaches, though not much can be done with 3 points....
+        #loosely based on more traditional approaches of segment finding, though not much can be done with 3 points....
 
         #procedure:
         #1) Start with most precise points (first XUV) as seeds
@@ -770,25 +814,32 @@ def AltReconstructTracks(Hits,tolerance,pitch,TrackerZ,stripTolerance,beamSpread
         #3) Use vector from first two hits to project to RT and match hits in acceptable area 
         #4) Filter tracks somehow- merge similar tracks, 
 
-        ####### MAYBE TRY SWAPPING I AND J: SHOULD HAVE LOWEST AMBIGUITY IN SECOND MODULE AS TRACKS HAVE SPREAD OUT MORE?? #########
-        print "lenghts=",len(Hits[0]),len(Hits[1])
         tracks=[]
         for i in Hits[0]:
                 segments=[]
-                ZSeparation=np.mean(TrackerZ[1])-np.mean(TrackerZ[0])
                 for j in Hits[1]:
-                        if CheckProjection(i,j,ZSeparation,stripTolerance,pitch,beamSpread):
+                        if CheckProjection(i,j,TrackerZ,stripTolerance,pitch,beamSpread):
                                 segments.append([i,j])
-                                tracks.append([i,j])
-                #if len(segments)>0:
-                #        segments.sort(key=SegmentSorter)
-                #        tracks.append(segments[0])
+                                #tracks.append([i,j])
+                for segment in segments:
+                        moduleDist=np.mean(TrackerZ[1])-np.mean(TrackerZ[0])
+                        RTDist=np.mean(TrackerZ[2])-np.mean(TrackerZ[1])
+                        
+                        #find y-gradient between module and extrapolate to RT
+                        yM=(segment[1][1]-segment[0][1])/moduleDist
+                        yFinal=segment[1][1]+yM*RTDist
+                        
+                        #find x-gradient between module and extrapolate to RT
+                        xM=(segment[1][0]-segment[0][0])/moduleDist
+                        xFinal=segment[1][0]+xM*RTDist
 
-                #ZSeparation=TrackerZ[2]-TrackerZ[1]
-                #for segment in segments:
-                #        for k in Hits[k]:
-                #                if CheckRT(segment,k,ZSeparation,stripTolerance,pitch):
-                 #                       tracks.append([i,j,k])
+                        #loop over RT hits to see if any agree within tolerance
+                        for k in Hits[2]:
+                                r= math.sqrt( (k[0]-xFinal)**2 + (k[1]-yFinal)**2 )
+                                #print r,stripTolerance*pitch
+                                if r<2*stripTolerance*pitch:
+                                        #print
+                                        tracks.append([i,j,k])
 
                 #filter tracks by chi2 if more than one found
 
@@ -932,7 +983,6 @@ def DrawTrackMap(name,Tracks,XY,xmax):
 def GetTrackSeparation(trueTrack,recoTrack,effTolerance):
 
         passed=True
-        
         for trueHit,recoHit in zip(trueTrack,recoTrack):
                 #for every point on track check if the true and reconstructed hits agree
                 separation=math.sqrt((trueHit[0]-recoHit[0])**2 + (trueHit[1]-recoHit[1])**2)
@@ -956,6 +1006,7 @@ def GetTrackEfficiency(effTolerance,XY,mXmY,RecoTracks,TrackerZ,pitch):
         
         #loop over all true protons
         for coord,direction in zip(XY,mXmY):
+
                 #create a track for the true proton 
                 trueTrack=[]
                 passed=False

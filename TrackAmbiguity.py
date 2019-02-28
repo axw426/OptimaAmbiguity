@@ -8,6 +8,7 @@ from ROOT import gROOT, TCanvas, TF1, TFile, gStyle,TH2F, TH1F, TMultiGraph, TGr
 import time
 import argparse
 from array import array
+import copy
 
 hf.SetSeed(2022)
 np.random.seed(53234)
@@ -72,6 +73,11 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
         trackAmbiguity=[]
         correctedTrackAmbiguity=[]
 
+        altnTracks=[]
+        alttrackEfficiency=[]
+        alttrackAmbiguity=[]
+        altcorrectedTrackAmbiguity=[]
+
         nTrackerHits=[]
         trackerEffs=[]
         ambiguity=[]
@@ -87,7 +93,7 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
         #reset output file and setup histograms for loop
         MyFile =TFile("tracking.root","RECREATE");
         for i in range(NLoops):
-                if i%1 == 0:
+                if i%10 == 0:
                         print("Processing loop "+(str)(i)+" of "+(str)(NLoops))
 
                 #get nProtons according to possion distribution
@@ -105,6 +111,7 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
                 XY=hf.GetRandomXY(nProton,size,width,posX,posY)
                 mXmY=hf.GetDirections(nProton,beamSpread,False)
 
+       
                 #reconstruct hits for each tracker module
                 TrackerHits=[]
                 MaxNStrips=[]
@@ -120,10 +127,14 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
 
                         #find overlap of strips and return hit objects of form (XCoord,YCoord,[stripX,stripU,stripV],[radial distance to intersections])
                         Hits=hf.FindOverlaps(Strips,pitch,TrackerAngles[module],stripTolerance,useHalfStrips)
+
                         #verify that hits are reconstructed within correct area
                         #Hits=hf.CheckInsideDetectorArea(Hits,pitch,size,TrackerAngles[module])
+
                         #look for obvious cases of fake hits (adjacent to each other) and merge them by averaging x-y cooords
+                        #turned off due to large strip tolerance needed for rear trackers
                         #Hits=hf.MergeAdjacentHits(Hits,stripTolerance,pitch)
+
                         TrackerHits.append(Hits)
                         nTrackerHits[module].append(len(Hits))
                         #print nTrackerHits[module][-1]
@@ -147,43 +158,50 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
 
                 #reconstruct tracks
                 #print "Building tracks"
-
                 MaxNTracks=max(MaxNStrips)
                 if len(TrackerAngles)>1:
-                        RecoTracks=hf.ReconstructTracks(TrackerHits,trackTolerance,pitch,MaxNTracks,restrictNTracks,TrackerZ,stripTolerance)
-                       # hf.WriteTracks(outfilename,RecoTracks,ZMeans,i)
+                        RecoTracks=hf.ReconstructTracks(copy.deepcopy(TrackerHits),trackTolerance,pitch,MaxNTracks,restrictNTracks,TrackerZ,stripTolerance,beamSpread)
+                        #AltRecoTracks=hf.AltReconstructTracks(TrackerHits,trackTolerance,pitch,TrackerZ,stripTolerance,beamSpread)
+                        # hf.WriteTracks(outfilename,RecoTracks,ZMeans,i)
+                        AltRecoTracks=RecoTracks
                 else:
                         RecoTracks=TrackerHits[0]
-                     
+
                 nTracks.append(len(RecoTracks))
 
-                #print RecoTracks
-                #for hit in RecoTracks[0]:
-                #        print hit[3]
-                
                 #get track efficiency
-                #print "Calculate efficiency",len(RecoTracks)
-
                 eff=hf.GetTrackEfficiency(stripTolerance*pitch,XY,mXmY,RecoTracks,TrackerZ,pitch)
                 trackEfficiency.append(100*eff)
 
                 #calculate track ambiguity rate
                 nFakeTracks=len(RecoTracks)-(nProton*eff)
-                if len(RecoTracks)>0:
+                if len(RecoTracks)>0 :
                         trackAmbiguity.append(100*(len(RecoTracks)-nProton)/len(RecoTracks))
                         correctedTrackAmbiguity.append(100*nFakeTracks/len(RecoTracks))
+
+                #results for alternative tracking method
+                altnTracks.append(len(AltRecoTracks))
+                
+                alteff=hf.GetTrackEfficiency(stripTolerance*pitch,XY,mXmY,AltRecoTracks,TrackerZ,pitch)
+                alttrackEfficiency.append(100*alteff)
+
+                #calculate track ambiguity rate
+                altnFakeTracks=len(AltRecoTracks)-(nProton*alteff)
+                if len(AltRecoTracks)>0 :
+                        alttrackAmbiguity.append(100*(len(AltRecoTracks)-nProton)/len(AltRecoTracks))
+                        altcorrectedTrackAmbiguity.append(100*altnFakeTracks/len(AltRecoTracks))
+
                 
                 if saveStripMaps and len(TrackerAngles)>1:
                         hf.DrawTrackMap("TrackMap",RecoTracks,XY,xmax)
 
                 
-
         for module in range(len(TrackerAngles)):
                 print "Module ",module,": Hits= ",sum(nTrackerHits[module])," Ambiguity= ",np.mean(ambiguity[module]),"%"," Efficiency=",np.mean(trackerEffs[module]),"Efficiency corrected ambiguity= ",np.mean(correctedAmbiguity[module]),"%"
 
-
         print "Combined: Tracks= ",sum(nTracks)," Ambiguity= ",np.mean(trackAmbiguity),"%"," Efficiency=",np.mean(trackEfficiency),"Efficiency corrected ambiguity= ",np.mean(correctedTrackAmbiguity),"%"
-
+        print "AltCombined: Tracks= ",sum(altnTracks)," Ambiguity= ",np.mean(alttrackAmbiguity),"%"," Efficiency=",np.mean(alttrackEfficiency),"Efficiency corrected ambiguity= ",np.mean(altcorrectedTrackAmbiguity),"%"
+        
         _Efficiency.append(np.mean(trackEfficiency))
         _Purity.append(100-np.mean(correctedTrackAmbiguity))
         _NumberOfProtons.append(nMeanProton)
@@ -199,7 +217,6 @@ effGraph.SetMarkerSize(2)
 effGraph.GetXaxis().SetTitle("Mean N Proton")
 effGraph.GetYaxis().SetTitle("Efficiency/Purity (%)")
 effGraph.SetTitle("Efficiency")
-#effGraph.Draw("AP")
 
 purGraph=TGraphErrors(len(_NumberOfProtons),_NumberOfProtons,_Purity,_NumberOfProtonsErr,_PurityErr)
 purGraph.SetMarkerStyle(5)
