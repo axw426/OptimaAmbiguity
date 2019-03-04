@@ -4,6 +4,7 @@ from ROOT import gROOT, TCanvas, TF1, TF2, TH2F, TFile, TLine, TH1F, TLegend,TGr
 from array import array
 import copy
 import numpy as np
+
 def SetSeed(seed):
 	random.seed(seed)
 
@@ -755,7 +756,18 @@ def GetChi2_SingleFit(hits,TrackerZ,stripTolerance,pitch):
 
 hChi2=TH1F("hCHi2","Chi2 of fit",50,-0.5,49.5)
 
-def ReconstructTracks3Planes(Hits,tolerance,pitch,TrackerZ,stripTolerance):
+def CheckProjection(i,j,TrackerZ,stripTolerance,pitch, beamSpread):
+
+        ZSeparation=np.mean(TrackerZ[1])-np.mean(TrackerZ[0])
+        sigma=2
+        maxSeparation=2*math.tan(sigma*beamSpread/1000.0)*ZSeparation + stripTolerance*pitch
+        separation=GetSeparation(i,j)
+        if separation<maxSeparation:
+                return True
+        else:
+                return False
+
+def ReconstructTracks3Planes(Hits,tolerance,pitch,TrackerZ,stripTolerance,beamSpread):
 
         RecoTracks=[]
 
@@ -765,11 +777,20 @@ def ReconstructTracks3Planes(Hits,tolerance,pitch,TrackerZ,stripTolerance):
                 bestJPos=-1
                 bestKPos=-1
                 for i in range(len(Hits[0])):
+                        hitI=Hits[0][i]
                         for j in range(len(Hits[1])):
+                                hitJ=Hits[1][j]
+
+                                #speed optimization- check if both XUV points are compatable for expected beam spread
+                                if CheckProjection(hitI,hitJ,TrackerZ,stripTolerance,pitch,beamSpread)==False:
+                                        continue
+                                        
                                 for k in range(len(Hits[2])):
-                                        hitI=Hits[0][i]
-                                        hitJ=Hits[1][j]
                                         hitK=Hits[2][k]
+
+                                        if CheckProjection(hitJ,hitK,TrackerZ,stripTolerance,pitch,beamSpread)==False:
+                                                continue
+                                
                                         chi2=GetChi2([hitI,hitJ,hitK],TrackerZ,stripTolerance,pitch)
                                         if chi2<bestChi2:
                                                 bestIPos=i
@@ -789,22 +810,41 @@ def ReconstructTracks3Planes(Hits,tolerance,pitch,TrackerZ,stripTolerance):
         hChi2.Write()
         return RecoTracks
 
-def CheckProjection(i,j,TrackerZ,stripTolerance,pitch, beamSpread):
+def ReconstructTracks3PlanesAlt(Hits,tolerance,pitch,TrackerZ,stripTolerance,beamSpread):
 
-        ZSeparation=np.mean(TrackerZ[1])-np.mean(TrackerZ[0])
-        sigma=2
-        maxSeparation=2*math.tan(sigma*beamSpread/1000.0)*ZSeparation + stripTolerance*pitch
-        separation=GetSeparation(i,j)
-        if separation<maxSeparation:
-                return True
-        else:
-                return False
+        #alternative version in which hits aren't removed after being accepted into track, instead accept all allowed combinations
+        #gives ~100% efficiency, but drastically sacrifices ambiguity- need to refine tracks afterwards
+        
+        RecoTracks=[]
 
-def SegmentSorter(hits):
-        return GetSeparation(hits[0],hits[1])
+        for i in range(len(Hits[0])):
+                bestIPos=-1
+                bestJPos=-1
+                bestKPos=-1
+                hitI=Hits[0][i]
+                for j in range(len(Hits[1])):
+                        hitJ=Hits[1][j]
+                        
+                        #speed optimization- check if both XUV points are compatable for expected beam spread
+                        if CheckProjection(hitI,hitJ,TrackerZ,stripTolerance,pitch,beamSpread)==False:
+                                continue
+                                        
+                        for k in range(len(Hits[2])):
+                                hitK=Hits[2][k]
+                                
+                                if CheckProjection(hitJ,hitK,TrackerZ,stripTolerance,pitch,beamSpread)==False:
+                                        continue
+                                
+                                chi2=GetChi2([hitI,hitJ,hitK],TrackerZ,stripTolerance,pitch)
+
+                                if chi2<tolerance:
+                                        #Append hit positions to track list
+                                        RecoTracks.append([hitI,hitJ,hitK,chi2])
+                
+        return RecoTracks
 
 
-def AltReconstructTracks(Hits,tolerance,pitch,TrackerZ,stripTolerance,beamSpread):
+def ReconstructTracksAlt(Hits,tolerance,pitch,TrackerZ,stripTolerance,beamSpread):
 
         #loosely based on more traditional approaches of segment finding, though not much can be done with 3 points....
 
@@ -812,7 +852,7 @@ def AltReconstructTracks(Hits,tolerance,pitch,TrackerZ,stripTolerance,beamSpread
         #1) Start with most precise points (first XUV) as seeds
         #2) Use uncertainty in position + expected MS angles to match to hits in second module i.e. check difference in radius ~ module separation*tanTheta + 2*stripTolerance 
         #3) Use vector from first two hits to project to RT and match hits in acceptable area 
-        #4) Filter tracks somehow- merge similar tracks, 
+        #4) Filter tracks somehow- merge similar tracks that are nearby or that use the same hits
 
         tracks=[]
         for i in Hits[0]:
@@ -911,7 +951,7 @@ def ReconstructTracks(Hits,trackTolerance,pitch,MaxNTracks,restrictNTracks,Track
         if len(Hits)==2:
                 AllTracks=ReconstructTracks2Planes(Hits,trackTolerance,pitch)
         elif len(Hits)==3:
-                AllTracks=ReconstructTracks3Planes(Hits,trackTolerance,pitch,TrackerZ,stripTolerance) 
+                AllTracks=ReconstructTracks3Planes(Hits,trackTolerance,pitch,TrackerZ,stripTolerance,beamSpread) 
         elif len(Hits)==4:
                 AllTracks=ReconstructTracks4Planes(Hits,trackTolerance,pitch)
         else:
