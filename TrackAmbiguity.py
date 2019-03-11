@@ -169,9 +169,9 @@ for nMeanProton in range(minProtons,minProtons+protonRange):
 
                 
         for module in range(len(TrackerAngles)):
-                print "Module ",module,": Hits= ",sum(nTrackerHits[module])," Ambiguity= ",np.mean(ambiguity[module]),"%"," Efficiency=",np.mean(trackerEffs[module]),"Efficiency corrected ambiguity= ",np.mean(correctedAmbiguity[module]),"%"
+                print "Module ",module,": Hits= ",sum(nTrackerHits[module])," Ambiguity= ",np.mean(ambiguity[module]),"%"," Efficiency=",np.mean(trackerEffs[module]),"Purity= ",100-np.mean(correctedAmbiguity[module]),"%"
 
-        print "Combined: Tracks= ",sum(nTracks)," Ambiguity= ",np.mean(trackAmbiguity),"%"," Efficiency=",np.mean(trackEfficiency),"Efficiency corrected ambiguity= ",np.mean(correctedTrackAmbiguity),"%"
+        print "Combined: Tracks= ",sum(nTracks)," Ambiguity= ",np.mean(trackAmbiguity),"%"," Efficiency=",np.mean(trackEfficiency),"Purity= ",100-np.mean(correctedTrackAmbiguity),"%"
         print "Errors: Eff. Error=",np.std(trackEfficiency)/math.sqrt(NLoops),"Purity Err",np.std(correctedTrackAmbiguity)/math.sqrt(NLoops),"%"
         
         _Efficiency.append(np.mean(trackEfficiency))

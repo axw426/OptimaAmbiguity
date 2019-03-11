@@ -1,6 +1,6 @@
 import random
 import math
-from ROOT import gROOT, TCanvas, TF1, TF2, TH2F, TFile, TLine, TH1F, TLegend,TGraph,TGraphErrors
+from ROOT import gROOT, TCanvas, TF1, TF2, TH2F, TFile, TLine, TH1F, TLegend,TGraph,TGraphErrors,TObject
 from array import array
 import copy
 import numpy as np
@@ -651,8 +651,19 @@ def RemoveAmbiguities(inHits,rawAngle,pitch):
 
         return XUVAcceptedHits
 
+def GetGradient(hitI,hitJ,TrackerZ):
+        
+        deltaZ=np.mean(TrackerZ[1])-np.mean(TrackerZ[0])
 
-def ReconstructTracks2Planes(Hits,tolerance,pitch):
+        mX=(hitJ[0]-hitI[0])/deltaZ
+        mY=(hitJ[1]-hitI[1])/deltaZ
+
+        cX=hitI[0]-mX*np.mean(TrackerZ[0])
+        cY=hitI[1]-mY*np.mean(TrackerZ[0])
+
+        return [cX,mX,cY,mY]
+        
+def ReconstructTracks2Planes(Hits,tolerance,pitch,TrackerZ):
 
         RecoTracks=[]
         #loop over all hits pairs and find pair with minimum separation, add as track and remove hits from hit database
@@ -660,6 +671,7 @@ def ReconstructTracks2Planes(Hits,tolerance,pitch):
                 minimumSeparation=100000
                 bestIPos=-1
                 bestJPos=-1
+                
                 for i in range(len(Hits[0])):
                         for j in range(len(Hits[1])):
                                 hitI=Hits[0][i]
@@ -669,9 +681,10 @@ def ReconstructTracks2Planes(Hits,tolerance,pitch):
                                         bestIPos=i
                                         bestJPos=j
                                         minimumSeparation=r
+                                        bestFitParams=GetGradient(hitI,hitJ,TrackerZ)
                 if minimumSeparation<tolerance:
                         #Append hit positions to track list
-                        RecoTracks.append([Hits[0][bestIPos],Hits[1][bestJPos]])
+                        RecoTracks.append([Hits[0][bestIPos],Hits[1][bestJPos],bestFitParams])
                         #delete entries from Hits
                         del Hits[0][bestIPos]
                         del Hits[1][bestJPos]
@@ -682,6 +695,7 @@ def ReconstructTracks2Planes(Hits,tolerance,pitch):
 
 def GetChi2(hits,TrackerZ,stripTolerance,pitch):
 
+        
         _X,_Y,_Z=array('d'),array('d'),array('d')
         _XErr,_YErr,_ZErr=array('d'),array('d'),array('d')
 
@@ -716,7 +730,7 @@ def GetChi2(hits,TrackerZ,stripTolerance,pitch):
 
         #print chi2X,chi2Y
 
-        return chi2X*chi2Y
+        return chi2X*chi2Y, [cX,mX,cY,mY]
 
 
 def GetChi2_SingleFit(hits,TrackerZ,stripTolerance,pitch):
@@ -748,13 +762,9 @@ def GetChi2_SingleFit(hits,TrackerZ,stripTolerance,pitch):
         myfitResult=graph.GetFunction("myfit")
         chi2=myfitResult.GetChisquare()
         
-        #graph.Write()
         del graph
 
-        #print chi2, [[cX,mX],[cY,mY]]
         return chi2
-
-hChi2=TH1F("hCHi2","Chi2 of fit",50,-0.5,49.5)
 
 def CheckProjection(i,j,TrackerZ,stripTolerance,pitch, beamSpread):
 
@@ -770,12 +780,12 @@ def CheckProjection(i,j,TrackerZ,stripTolerance,pitch, beamSpread):
 def ReconstructTracks3Planes(Hits,tolerance,pitch,TrackerZ,stripTolerance,beamSpread):
 
         RecoTracks=[]
-
         while len(Hits[0])>0 and len(Hits[1])>0 and len(Hits[2])>0:
                 bestChi2=100000
                 bestIPos=-1
                 bestJPos=-1
                 bestKPos=-1
+                bestFitParam=[]
                 for i in range(len(Hits[0])):
                         hitI=Hits[0][i]
                         for j in range(len(Hits[1])):
@@ -791,23 +801,23 @@ def ReconstructTracks3Planes(Hits,tolerance,pitch,TrackerZ,stripTolerance,beamSp
                                         if CheckProjection(hitJ,hitK,TrackerZ,stripTolerance,pitch,beamSpread)==False:
                                                 continue
                                 
-                                        chi2=GetChi2([hitI,hitJ,hitK],TrackerZ,stripTolerance,pitch)
+                                        chi2,fitParam=GetChi2([hitI,hitJ,hitK],TrackerZ,stripTolerance,pitch)
                                         if chi2<bestChi2:
                                                 bestIPos=i
                                                 bestJPos=j
                                                 bestKPos=k
                                                 bestChi2=chi2
-                hChi2.Fill(bestChi2)
+                                                bestFitParam=fitParam
+                #print bestChi2
                 if bestChi2<tolerance:
                         #Append hit positions to track list
-                        RecoTracks.append([Hits[0][bestIPos],Hits[1][bestJPos],Hits[2][bestKPos]])
+                        RecoTracks.append([Hits[0][bestIPos],Hits[1][bestJPos],Hits[2][bestKPos],bestFitParam])
                         #delete entries from Hits
                         del Hits[0][bestIPos]
                         del Hits[1][bestJPos]
                         del Hits[2][bestKPos]
                 else:
                         break
-        hChi2.Write()
         return RecoTracks
 
 def ReconstructTracks3PlanesAlt(Hits,tolerance,pitch,TrackerZ,stripTolerance,beamSpread):
@@ -949,7 +959,7 @@ def ReconstructTracks4Planes(Hits,trackTolerance,pitch):
 def ReconstructTracks(Hits,trackTolerance,pitch,MaxNTracks,restrictNTracks,TrackerZ,stripTolerance,beamSpread ):
 
         if len(Hits)==2:
-                AllTracks=ReconstructTracks2Planes(Hits,trackTolerance,pitch)
+                AllTracks=ReconstructTracks2Planes(Hits,trackTolerance,pitch,TrackerZ)
         elif len(Hits)==3:
                 AllTracks=ReconstructTracks3Planes(Hits,trackTolerance,pitch,TrackerZ,stripTolerance,beamSpread) 
         elif len(Hits)==4:
@@ -1066,6 +1076,40 @@ def GetTrackEfficiency(effTolerance,XY,mXmY,RecoTracks,TrackerZ,pitch):
         return nTrueFound/(float)(len(XY))
 
 
+def GetCombinedEfficiency(stripTolerance,coords,directions,CombinedRecoTracks,ZMeans,pitch):
+
+        nTrueFound=0.0
+        
+        #loop over all true protons
+        for frontCoord,frontDir,rearCoord,rearDir in zip(coords[0],directions[0],coords[1],directions[1]):
+
+                #create a track for the true proton 
+                trueTrackFront=[]
+                trueTrackRear=[]
+                
+                passed=False
+                for position in ZMeans[0:2]:
+                        trueTrackFront.append([frontCoord[0]+frontDir[0]*position,frontCoord[1]+frontDir[1]*position])
+                for position in ZMeans[2:5]:
+                        trueTrackRear.append([rearCoord[0]+rearDir[0]*position,rearCoord[1]+rearDir[1]*position])
+
+                #loop over reco tracks and see if any match at each module within hit tolerance
+                for recoTrack in CombinedRecoTracks:
+                        
+                        if GetTrackSeparation(trueTrackFront,recoTrack[0],stripTolerance[0]*pitch) and GetTrackSeparation(trueTrackRear,recoTrack[1],stripTolerance[1]*pitch):
+                                nTrueFound+=1.0
+                                passed=True
+                                break
+
+                #if passed==False and len(CombinedRecoTracks)>0 :
+                #        print "Strip tolerances",stripTolerance
+                #        print "True Track=",trueTrackFront,trueTrackRear
+                #        for track in CombinedRecoTracks:
+                #                print "RecoTrackFront=",track[0][0][0:2],track[0][1][0:2],track[1][0][0:2],track[1][1][0:2],track[1][2][0:2]
+                #        print ""
+        return nTrueFound/(float)(len(coords[0]))
+
+
 def WriteTracks(outfilename,RecoTracks,ZMeans,loop):
 
         outString=(str)(loop)       
@@ -1168,45 +1212,154 @@ def CheckInsideDetectorArea(Hits,pitch,size,angles):
 
         return acceptedHits
 
-def GenerateMSAngle(ebeam=200):
+hDisplacement=TH1F("hDisplacement","Displacment (um)",50,-20000,20000)
+hAngle=TH1F("hAngle","Angle (rad)",50,-0.1,0.1)
+
+def GenerateMSAngle(phantomdepth,ebeam):
 
         #ebeam = kinetic energy in MeV
         
         m=938.272 #MeV
         E=ebeam+m #K.E. plus rest mass
         p=math.sqrt(E**2 -m**2)
-        print "p=",p
         v=p/E
         vp=v*p
-        print "beta*momentum= ",vp
         
         #silicon
         #x=155 #um
         #X0=9.37*10000 #radiation length, convert from cm to um
 
         #water
-        x=30.00*10000 #um
+        x=phantomdepth*10000 #um
         X0=36.08*10000 #radiation length, convert from cm to um
-
         distance=math.sqrt(x/X0)
-        #distance=math.sqrt(0.6)
-        print "x/X0=",distance**2
         
         #pdg- theta0 is the sigma for gaussian distribution of the angles
-        theta0=1000*(13.6/vp)*distance*(1+0.038*math.log(distance)) 
+        theta0=(13.6/vp)*distance*(1+0.038*math.log(distance)) 
         
-        #hanson approximation- from Harvard notes
-        #theta0Alt=1000*(14.1/vp)*distance*(1+(1.0/9.0)*math.log(distance,10)) 
-
-        print "Theta0=",theta0,"mrad"
-
-        #pdg seems to underestimate scattering relative to hanson? Potentially not including strong interactions
-
         a1=random.gauss(0.0,1.0)
         a2=random.gauss(0.0,1.0)
 
         #from pdg for MS, way to generate correlated angular and spacial shifts
-        radialShift=a1*x*theta0Alt/math.sqrt(12.0) + a2*x*theta0Alt/2.0
-        thetashift=a2*theta0Alt
+        spatialShift=a1*x*theta0/math.sqrt(12.0) + a2*x*theta0/2.0 #um
+        thetaShift=a2*theta0 #rad
+
+        hDisplacement.Fill(spatialShift)
+        hDisplacement.Write("",TObject.kOverwrite)
+
+        hAngle.Fill(thetaShift)
+        hAngle.Write("",TObject.kOverwrite)
+
+        #print spatialShift
+        return spatialShift,thetaShift
+
+        
+def ApplyMultipleScattering(XY,mXmY,phantomdepth,energy,ZPosition):
+
+        XY_MS,mXmY_MS=[],[]
+        halfPhantomWidth=phantomdepth*10000.0/2.0
+
+        for xy,mxmy in zip(XY,mXmY):
+
+               spatialShiftX,thetaShiftX= GenerateMSAngle(phantomdepth,energy)
+               spatialShiftY,thetaShiftY= GenerateMSAngle(phantomdepth,energy)
+
+               #should we scale theta by sqrt(2) to account for theta0= sqrt(thetaX**2+thetaY**2)
+
+               #small angle approximation- tan(theta) ~ theta so can just add
+               mXmY_MS.append([mxmy[0]+thetaShiftX,mxmy[1]+thetaShiftY])
+
+               currentX=xy[0]+(mxmy[0]*(ZPosition+halfPhantomWidth))+spatialShiftX
+               currentY=xy[1]+(mxmy[1]*(ZPosition+halfPhantomWidth))+spatialShiftY
+               #currentX=xy[0]
+               #currentY=xy[1]
+
+               X0=currentX-mXmY_MS[-1][0]*(ZPosition+halfPhantomWidth)
+               Y0=currentY-mXmY_MS[-1][1]*(ZPosition+halfPhantomWidth)
+
+               XY_MS.append([X0,Y0])
+
+               
+        return XY_MS,mXmY_MS
 
 
+
+def MatchTrack(RecoTracks,RearRecoTracks,ZMeans,tolerance):
+
+        #matches tracks from front and rear of patient by calculating difference in projected path at centre of phantom
+        combinedTracks=[]
+        
+        phantomCentre=(ZMeans[2]+ZMeans[1])/2
+
+   
+        while len(RecoTracks)>0 and len(RearRecoTracks)>0:
+                bestRadius=1000000000
+                bestI=10000
+                bestJ=10000
+                for i in range(len(RecoTracks)):
+                        for j in range(len(RearRecoTracks)):
+
+                                front=RecoTracks[i]
+                                rear=RearRecoTracks[j]
+                                
+                                frontFit=front[-1] #[cX,mX,cY,mY]
+                                rearFit=rear[-1]
+
+                                xFront=frontFit[1]*phantomCentre+frontFit[0]
+                                yFront=frontFit[3]*phantomCentre+frontFit[2]
+
+                                xRear=rearFit[1]*phantomCentre+rearFit[0]
+                                yRear=rearFit[3]*phantomCentre+rearFit[2]
+
+                                radius=math.sqrt( (xFront-xRear)**2 + (yFront-yRear)**2 )
+
+                                if radius<bestRadius:
+                                        bestRadius=radius
+                                        bestI=i
+                                        bestJ=j
+
+                                
+                if bestRadius<tolerance:
+                        combinedTracks.append([RecoTracks[bestI],RearRecoTracks[bestJ]])
+                        #delete best positions tracks
+                        del RecoTracks[bestI]
+                        del RearRecoTracks[bestJ]
+                else:
+                        break
+                        
+        return combinedTracks
+
+
+#100% efficienct version for debugging
+#def MatchTrack(RecoTracks,RearRecoTracks,ZMeans,tolerance):
+#
+#        #matches tracks from front and rear of patient by calculating difference in projected path at centre of phantom
+#        combinedTracks=[]
+#        
+#        phantomCentre=(ZMeans[2]+ZMeans[1])/2
+#        for i in range(len(RecoTracks)):
+#                for j in range(len(RearRecoTracks)):
+#
+#                        front=RecoTracks[i]
+#                        rear=RearRecoTracks[j]
+#
+#                        frontFit=front[-1] #[cX,mX,cY,mY]
+#                        rearFit=rear[-1]
+#
+#                        xFront=frontFit[1]*phantomCentre+frontFit[0]
+#                        yFront=frontFit[3]*phantomCentre+frontFit[2]
+#
+#                        xRear=rearFit[1]*phantomCentre+rearFit[0]
+#                        yRear=rearFit[3]*phantomCentre+rearFit[2]
+#
+#                        radius=math.sqrt( (xFront-xRear)**2 + (yFront-yRear)**2 )
+#
+#                        if radius<tolerance: 
+#                                combinedTracks.append([RecoTracks[i],RearRecoTracks[j]])
+#                        #else:
+#                        #        print "RejectedTrack=",RecoTracks[i][0][0:2],RecoTracks[i][1][0:2],RearRecoTracks[j][0][0:2],RearRecoTracks[j][1][0:2],RearRecoTracks[j][2][0:2]
+#                        #        print "Radius was ",radius
+#                        #        print xFront,yFront,xRear,yRear
+#                        
+#        return combinedTracks
+#

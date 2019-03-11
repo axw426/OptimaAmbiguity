@@ -10,21 +10,22 @@ hf.SetSeed(2022)
 
 #stripTolerance=1.5 #4 planes per module...for some reason- shape varies depending on position
 
-beamSpread=35.0 #mrad
-sigma=2.0 #number of standard deviations of beamspread to try and accept
-
-size=20 #cm
-
-sensorThickness=155.0 #um
-interPlaneDistance=12.0*1000 #mm to um
-interModuleDistance=100.0*1000 #mm to um
-phantomGap=80.0*1000 #mm to um
-RTDistance=interModuleDistance
 
 geometryNames=["1ModuleXY","1ModuleXUV","2ModuleXY","2ModuleXUV","4ModuleXY","4ModuleXUV","2ModuleXUV_RT"]
 
 
 def init(geoname):
+
+        beamSpread=3.0 #mrad
+        sigma=2.0 #number of standard deviations of beamspread to try and accept
+
+        size=20 #cm
+
+        sensorThickness=155.0 #um
+        interPlaneDistance=12.0*1000 #mm to um
+        interModuleDistance=100.0*1000 #mm to um
+        phantomGap=80.0*1000 #mm to um
+        RTDistance=interModuleDistance
 
         pitch=100.0
 
@@ -179,6 +180,57 @@ def init(geoname):
                 TrackerAngles.append([30,90,150])
                 TrackerZ.append([pos,pos+interPlaneDistance,pos+2*interPlaneDistance])        
 
+
+
+        elif  geoname=="FullSystem":
+
+                stripTolerance=[]
+                trackTolerance=[]
+                
+                pixelsize=0.7 #distance from centre of pixel to corner
+                MS_RMS=35
+                #beamSpread=[beamSpread,beamSpread+MS_RMS]
+                beamSpread=[beamSpread,beamSpread+MS_RMS]
+
+                #pre patient
+                stripTolerance.append(2*math.tan(sigma*beamSpread[0]/1000.0)*interPlaneDistance/pitch + pixelsize)
+                trackTolerance.append(2*math.tan(sigma*beamSpread[0]/1000.0)*interModuleDistance + stripTolerance[0]*pitch)
+
+                #postpatient
+                stripTolerance.append(2*math.tan(sigma*beamSpread[1]/1000.0)*interPlaneDistance/pitch + pixelsize)
+                trackTolerance.append(0.01)
+                
+                #trackTolerance=0.01 #to be thought about!! Is currently chi2 of x fit * chi2 of y fit... feels dodgy, need 2D fit?
+                #trackTolerance=25 #to be thought about!! Is currently chi2 of x vs y fit. Hard to accurately specify uncertainty on points as angular dependent...
+
+                pos=0
+
+                TrackerAngles.append([0,60,120])
+                TrackerZ.append([pos,pos+interPlaneDistance,pos+2*interPlaneDistance])
+
+                pos+=interModuleDistance+2*interPlaneDistance
+                
+                relativeAngle=30.0
+                TrackerAngles.append([0+relativeAngle,60+relativeAngle,120+relativeAngle])
+                TrackerZ.append([pos,pos+interPlaneDistance,pos+2*interPlaneDistance])
+
+                pos+=interModuleDistance+2*interPlaneDistance
+
+                relativeAngle=0.0
+                TrackerAngles.append([0+relativeAngle,60+relativeAngle,120+relativeAngle])
+                TrackerZ.append([pos,pos+interPlaneDistance,pos+2*interPlaneDistance])
+
+                pos+=interModuleDistance+2*interPlaneDistance
+
+                relativeAngle=30.0
+                TrackerAngles.append([0+relativeAngle,60+relativeAngle,120+relativeAngle])
+                TrackerZ.append([pos,pos+interPlaneDistance,pos+2*interPlaneDistance])
+
+                pos+=RTDistance+2*interPlaneDistance
+                
+                TrackerAngles.append([0,90])
+                TrackerZ.append([pos,pos+interPlaneDistance])
+                
         else:
                 print "\nWarning! Tried to use geometry: "+geoname+", but no such geometry exists!\n"
                 print "Available geometries are:"
@@ -190,16 +242,17 @@ def init(geoname):
         ZMeans=[]
         for z in TrackerZ:
                 ZMeans.append(sum(z)/len(z))
-        
-                
+ 
         print "\n##########################   Geometry   ##########################"
         print "Setting up geometry: "+geoname
         print "Total sensor size= ",size," cm"
         print "Pitch= ",pitch
         print "Tracker Angles= ",TrackerAngles
         print "Tracker Positions= ",TrackerZ
-        print "Strip Tolerance (maximum separation of strip intersections)= ",pitch*stripTolerance
+        print "Strip Tolerance (maximum separation of strip intersections)= ",stripTolerance
         print "Track Tolerance (maximum deviation from parallel beam to accept tracking)= ",trackTolerance
         print "###################################################################\n"
         
         return TrackerAngles,TrackerZ, ZMeans,stripTolerance,trackTolerance,pitch,beamSpread,size
+
+
